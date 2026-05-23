@@ -442,7 +442,7 @@
           </div>
           <div class="field">
             <label>Kilométrage annuel total du véhicule</label>
-            <input type="number" id="km_total" placeholder="ex: 18000" oninput="calc()">
+            <input type="number" id="km_total" placeholder="Calcul automatique" readonly>
           </div>
         </div>
         <div class="info-box">
@@ -733,8 +733,10 @@ function calc() {
     const dist = v('dist_aller');
     const cv = document.getElementById('cv').value;
     const electrique = document.getElementById('energie').value === 'electrique';
-    const kmTotal = v('km_total');
-    const kmPro = dist > 0 ? joursBureau * dist * 2 : 0;
+    const kmTotal = dist > 0 ? dist * 2 * (joursOuvres - (arret + teletravail)) : 0;
+    document.getElementById('km_total').value = Math.max(0, kmTotal);
+
+    const kmPro = Math.max(0, kmTotal);
 
     if (kmPro > 0 && cv) {
       fraisTransport = calcBareme(kmPro, cv, transportMode, electrique);
