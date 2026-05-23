@@ -574,11 +574,11 @@
         <div class="form-grid">
           <div class="field">
             <label>Salaire brut annuel (€)<span class="label-hint">avant impôts</span></label>
-            <input type="number" id="salaire" placeholder="ex: 42000" value="42000" oninput="calc()">
+            <input type="number" id="salaire" placeholder="ex: 42000" oninput="calc()">
           </div>
           <div class="field">
             <label>Nombre de parts fiscales</label>
-            <input type="number" id="nombre_parts" placeholder="ex: 2" value="1" step="0.5" oninput="calc()">
+            <input type="number" id="nombre_parts" placeholder="ex: 2" step="0.5" oninput="calc()">
           </div>
         </div>
         <div class="info-box">
@@ -598,15 +598,15 @@
         <div class="form-grid">
           <div class="field">
             <label>Jours ouvrés dans l'année</label>
-            <input type="number" id="jours_ouvres" placeholder="ex: 228" value="228" oninput="calc()">
+            <input type="number" id="jours_ouvres" placeholder="ex: 228" oninput="calc()">
           </div>
           <div class="field">
             <label>Jours en arrêt maladie</label>
-            <input type="number" id="jours_arret" placeholder="ex: 0" value="0" oninput="calc()">
+            <input type="number" id="jours_arret" placeholder="ex: 0" oninput="calc()">
           </div>
           <div class="field">
             <label>Jours en télétravail</label>
-            <input type="number" id="jours_teletravail" placeholder="ex: 45" value="0" oninput="calc()">
+            <input type="number" id="jours_teletravail" placeholder="ex: 45" oninput="calc()">
           </div>
         </div>
         <div class="info-box">
@@ -641,14 +641,17 @@
           <div class="form-grid">
             <div class="field">
               <label>Distance aller domicile → travail (km)</label>
-              <input type="number" id="dist_aller" placeholder="ex: 22" value="25" oninput="calc()">
+              <input type="number" id="dist_aller" placeholder="ex: 22" oninput="calc()">
             </div>
             <div class="field">
               <label>Puissance fiscale (CV)</label>
               <select id="cv" onchange="calc()">
-                <option value="5" selected>5 CV</option>
+                <option value="">— CV fiscaux —</option>
                 <option value="3">3 CV et moins</option>
                 <option value="4">4 CV</option>
+                <option value="5">5 CV</option>
+                <option value="6">6 CV</option>
+                <option value="7">7 CV et plus</option>
                 <option value="6">6 CV</option>
                 <option value="7">7 CV et plus</option>
               </select>
@@ -656,7 +659,8 @@
             <div class="field">
               <label>Énergie du véhicule</label>
               <select id="energie" onchange="calc()">
-                <option value="thermique" selected>Essence / Diesel / Hybride</option>
+                <option value="">— Énergie —</option>
+                <option value="thermique">Essence / Diesel / Hybride</option>
                 <option value="electrique">Électrique / Hydrogène (+20%)</option>
               </select>
             </div>
@@ -716,11 +720,11 @@
           <div class="form-grid">
             <div class="field">
               <label>Nombre de repas professionnels par an</label>
-              <input type="number" id="nb_repas_classique" placeholder="ex: 200" value="200" oninput="calc()">
+              <input type="number" id="nb_repas_classique" placeholder="ex: 200" oninput="calc()">
             </div>
             <div class="field">
               <label>Coût moyen par repas (€)</label>
-              <input type="number" id="cout_repas_classique" placeholder="ex: 10.00" value="10.00" step="0.01" oninput="calc()">
+              <input type="number" id="cout_repas_classique" placeholder="ex: 10.00" step="0.01" oninput="calc()">
             </div>
           </div>
         </div>
@@ -731,15 +735,15 @@
           <div class="form-grid">
             <div class="field">
               <label>Nombre de tickets par an</label>
-              <input type="number" id="nb_tickets" placeholder="ex: 200" value="200" oninput="calc()">
+              <input type="number" id="nb_tickets" placeholder="ex: 200" oninput="calc()">
             </div>
             <div class="field">
               <label>Valeur faciale du ticket (€)</label>
-              <input type="number" id="valeur_ticket" placeholder="ex: 8.38" value="8.38" step="0.01" oninput="calc()">
+              <input type="number" id="valeur_ticket" placeholder="ex: 8.38" step="0.01" oninput="calc()">
             </div>
             <div class="field">
               <label>Part employeur par ticket (€)</label>
-              <input type="number" id="part_employeur_ticket" placeholder="ex: 5.92" value="5.92" step="0.01" oninput="calc()">
+              <input type="number" id="part_employeur_ticket" placeholder="ex: 5.92" step="0.01" oninput="calc()">
             </div>
           </div>
         </div>
@@ -750,26 +754,26 @@
           <div class="form-grid">
             <div class="field">
               <label>Nombre de repas professionnels par an</label>
-              <input type="number" id="nb_repas_mixte" placeholder="ex: 100" value="100" oninput="calc()">
+              <input type="number" id="nb_repas_mixte" placeholder="ex: 100" oninput="calc()">
             </div>
             <div class="field">
               <label>Coût moyen par repas (€)</label>
-              <input type="number" id="cout_repas_mixte" placeholder="ex: 10.00" value="10.00" step="0.01" oninput="calc()">
+              <input type="number" id="cout_repas_mixte" placeholder="ex: 10.00" step="0.01" oninput="calc()">
             </div>
           </div>
           <div class="divider">Tickets restaurant</div>
           <div class="form-grid">
             <div class="field">
               <label>Nombre de tickets par an</label>
-              <input type="number" id="nb_tickets_mixte" placeholder="ex: 100" value="100" oninput="calc()">
+              <input type="number" id="nb_tickets_mixte" placeholder="ex: 100" oninput="calc()">
             </div>
             <div class="field">
               <label>Valeur faciale du ticket (€)</label>
-              <input type="number" id="valeur_ticket_mixte" placeholder="ex: 8.38" value="8.38" step="0.01" oninput="calc()">
+              <input type="number" id="valeur_ticket_mixte" placeholder="ex: 8.38" step="0.01" oninput="calc()">
             </div>
             <div class="field">
               <label>Part employeur par ticket (€)</label>
-              <input type="number" id="part_employeur_ticket_mixte" placeholder="ex: 5.92" value="5.92" step="0.01" oninput="calc()">
+              <input type="number" id="part_employeur_ticket_mixte" placeholder="ex: 5.92" step="0.01" oninput="calc()">
             </div>
           </div>
         </div>
@@ -807,19 +811,19 @@
         <div class="form-grid">
           <div class="field">
             <label>Frais de télétravail (€/an)</label>
-            <input type="number" id="frais_teletravail" placeholder="ex: 300" value="0" oninput="calc()">
+            <input type="number" id="frais_teletravail" placeholder="ex: 300" oninput="calc()">
           </div>
           <div class="field">
             <label>Frais de formation (€/an)</label>
-            <input type="number" id="frais_formation" placeholder="ex: 200" value="0" oninput="calc()">
+            <input type="number" id="frais_formation" placeholder="ex: 200" oninput="calc()">
           </div>
           <div class="field">
             <label>Frais de documentation (€/an)</label>
-            <input type="number" id="frais_doc" placeholder="ex: 100" value="0" oninput="calc()">
+            <input type="number" id="frais_doc" placeholder="ex: 100" oninput="calc()">
           </div>
           <div class="field">
             <label>Autres frais (préciser)</label>
-            <input type="number" id="frais_autres" placeholder="ex: 0" value="0" oninput="calc()">
+            <input type="number" id="frais_autres" placeholder="ex: 0" oninput="calc()">
           </div>
         </div>
       </div>
@@ -836,19 +840,19 @@
         <div class="form-grid">
           <div class="field">
             <label>Indemnités kilométriques reçues (€/an)</label>
-            <input type="number" id="remb_ik" placeholder="ex: 0" value="0" oninput="calc()">
+            <input type="number" id="remb_ik" placeholder="ex: 0" oninput="calc()">
           </div>
           <div class="field">
             <label>Prime carburant / mobilité (€/an)</label>
-            <input type="number" id="remb_carburant" placeholder="ex: 0" value="0" oninput="calc()">
+            <input type="number" id="remb_carburant" placeholder="ex: 0" oninput="calc()">
           </div>
           <div class="field">
             <label>Forfait mobilités durables (€/an)</label>
-            <input type="number" id="remb_mobilite" placeholder="ex: 0" value="0" oninput="calc()">
+            <input type="number" id="remb_mobilite" placeholder="ex: 0" oninput="calc()">
           </div>
           <div class="field">
             <label>Autres remboursements pro (€/an)</label>
-            <input type="number" id="remb_autres" placeholder="ex: 0" value="0" oninput="calc()">
+            <input type="number" id="remb_autres" placeholder="ex: 0" oninput="calc()">
           </div>
         </div>
         <div class="info-box">
