@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Calculateur Frais Réels v1.2 — Impôts France 2026</title>
+<title>Calculateur Frais Réels — Impôts France 2026</title>
 <link href="https://fonts.bunny.net/css?family=manrope:300,400,500,600|spectral:400,500,600" rel="stylesheet">
 <style>
   :root {
@@ -548,6 +548,9 @@
   .mt16 {
     margin-top: 16px;
   }
+  .hidden {
+    display: none !important;
+  }
 </style>
 </head>
 <body>
@@ -555,7 +558,7 @@
 <header>
   <div class="header-inner">
     <div class="header-badge">Déclaration France · 2026</div>
-    <h1>Calculateur<br><em>Frais Réels v1.2</em></h1>
+    <h1>Calculateur<br><em>Frais Réels</em></h1>
     <p class="header-sub">Avec gestion des tickets restaurant selon les règles officielles 2026 (ESCEC International & impots.gouv.fr).</p>
   </div>
 </header>
@@ -858,6 +861,72 @@
         </div>
       </div>
     </div>
+
+    <!-- SECTION 7 : MUTUELLE -->
+    <div class="card">
+      <div class="card-header" onclick="toggleCard('mutuelle')">
+        <div class="card-icon">🏥</div>
+        <div class="card-title">Mutuelle santé</div>
+        <div class="card-toggle" id="toggle-mutuelle">▾</div>
+      </div>
+      <div class="card-body" id="body-mutuelle">
+
+        <div class="form-grid single">
+          <div class="field">
+            <label>Type de mutuelle</label>
+            <div class="toggle-group mt8" id="mutuelle-type">
+              <button class="toggle-btn active" onclick="setMutuelle('entreprise_fiche', this)">🏢 Entreprise (déduite sur fiche de paie)</button>
+              <button class="toggle-btn" onclick="setMutuelle('entreprise_6dd', this)">📋 Entreprise (non déduite sur fiche de paie)</button>
+              <button class="toggle-btn" onclick="setMutuelle('madelin', this)">💼 TNS / Loi Madelin</button>
+              <button class="toggle-btn" onclick="setMutuelle('individuelle', this)">👤 Individuelle</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bloc : Entreprise déduite sur fiche de paie -->
+        <div id="block-mutuelle-fiche">
+          <div class="info-box" style="margin-top:14px">
+            ✅ <strong>Rien à faire.</strong> Ta part salariale est déjà soustraite de ton salaire imposable via ta fiche de paie. Aucune démarche supplémentaire lors de la déclaration.
+          </div>
+        </div>
+
+        <!-- Bloc : Entreprise NON déduite sur fiche de paie → case 6DD -->
+        <div id="block-mutuelle-6dd" class="hidden">
+          <div class="divider">Cotisations à déclarer en case 6DD</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Part salariale annuelle (€)<span class="label-hint">montant communiqué par l'employeur</span></label>
+              <input type="number" id="mutuelle_6dd" placeholder="ex: 480" oninput="calc()">
+            </div>
+          </div>
+          <div class="info-box" style="margin-top:12px">
+            📋 À reporter en <strong>case 6DD</strong> du formulaire <strong>2042 C</strong> (charges et imputations diverses). Ton employeur doit te communiquer ce montant par courrier.
+          </div>
+        </div>
+
+        <!-- Bloc : TNS / Loi Madelin -->
+        <div id="block-mutuelle-madelin" class="hidden">
+          <div class="divider">Déduction Madelin (TNS)</div>
+          <div class="form-grid">
+            <div class="field">
+              <label>Cotisations Madelin annuelles (€)</label>
+              <input type="number" id="mutuelle_madelin" placeholder="ex: 1200" oninput="calc()">
+            </div>
+          </div>
+          <div class="info-box" style="margin-top:12px">
+            💼 Les cotisations versées dans le cadre d'un contrat <strong>Madelin</strong> (artisans, commerçants, professions libérales, gérants majoritaires) sont déductibles du <strong>bénéfice imposable</strong> en BIC/BNC — pas en case 1AK. À déclarer dans ta liasse fiscale ou via ta déclaration 2035/2031.
+          </div>
+        </div>
+
+        <!-- Bloc : Individuelle -->
+        <div id="block-mutuelle-individuelle" class="hidden">
+          <div class="info-box" style="margin-top:14px; background: rgba(192,74,16,0.08); border-color: rgba(192,74,16,0.25); color: var(--warning)">
+            ❌ <strong>Non déductible.</strong> Les cotisations d'une mutuelle individuelle ou complémentaire personnelle ne sont pas déductibles des impôts, quelle que soit leur nature.
+          </div>
+        </div>
+
+      </div>
+    </div>
   </div><!-- end .main -->
 
   <!-- SIDEBAR RÉSULTAT -->
@@ -927,6 +996,10 @@
             <span class="detail-label">Gain / perte frais réels</span>
             <span class="detail-value" id="d-gain">—</span>
           </div>
+          <div class="detail-row" id="d-mutuelle" style="display:none; border-top: 1px solid rgba(255,255,255,0.15); padding-top:10px; margin-top:4px;">
+            <span class="detail-label" id="d-mutuelle-label">Mutuelle déductible</span>
+            <span class="detail-value green" id="d-mutuelle-val">—</span>
+          </div>
           <div class="detail-row" style="border-top: 1px solid rgba(255,255,255,0.2); padding-top: 10px; margin-top: 4px;">
             <span class="detail-label" style="color:#fff; font-weight:600;">Revenu par part</span>
             <span class="detail-value" id="d-revenu-par-part">—</span>
@@ -955,7 +1028,7 @@
 
 <footer>
   <div class="footer-inner">
-    <span class="footer-version">v1.2.0 · Barème 2026 (revenus 2025) · Avec tickets restaurant</span>
+    <span class="footer-version">v1.3.0 · Barème 2026 (revenus 2025)</span>
     <span class="footer-sep">·</span>
     <a class="footer-link" href="https://github.com/0rmx0/frais-reels" target="_blank" rel="noopener">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-3px;margin-right:5px">
@@ -970,6 +1043,19 @@
 // --- VARIABLES GLOBALES ---
 let currentTransport = 'voiture';
 let currentRepasType = 'classique';
+let currentMutuelle = 'entreprise_fiche';
+
+// --- SET MUTUELLE TYPE ---
+function setMutuelle(type, btn) {
+  currentMutuelle = type;
+  document.querySelectorAll('#mutuelle-type .toggle-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('block-mutuelle-fiche').classList.toggle('hidden', type !== 'entreprise_fiche');
+  document.getElementById('block-mutuelle-6dd').classList.toggle('hidden', type !== 'entreprise_6dd');
+  document.getElementById('block-mutuelle-madelin').classList.toggle('hidden', type !== 'madelin');
+  document.getElementById('block-mutuelle-individuelle').classList.toggle('hidden', type !== 'individuelle');
+  calc();
+}
 
 // Barème kilométrique 2026 (inchangé depuis 2025)
 const baremeKm = {
@@ -1193,6 +1279,21 @@ function calculRemboursements() {
          (parseFloat(document.getElementById('remb_autres').value) || 0);
 }
 
+// --- CALCUL MUTUELLE ---
+// Retourne { deductible, case, info }
+function calculMutuelle() {
+  if (currentMutuelle === 'entreprise_6dd') {
+    const montant = parseFloat(document.getElementById('mutuelle_6dd').value) || 0;
+    return { deductible: montant, case: '6DD', formulaire: '2042 C', info: 'Mutuelle entreprise (non déduite fiche de paie)' };
+  }
+  if (currentMutuelle === 'madelin') {
+    const montant = parseFloat(document.getElementById('mutuelle_madelin').value) || 0;
+    return { deductible: montant, case: 'BIC/BNC', formulaire: '2035/2031', info: 'Loi Madelin — déduction du bénéfice imposable' };
+  }
+  // fiche de paie ou individuelle → 0 impact
+  return { deductible: 0, case: null, formulaire: null, info: currentMutuelle === 'entreprise_fiche' ? 'Déjà déduite sur fiche de paie' : 'Non déductible' };
+}
+
 // --- CALCUL PRINCIPAL ---
 function calc() {
   // 1. Calcul des jours au bureau
@@ -1214,6 +1315,9 @@ function calc() {
   const fraisTransport = calculFraisTransport();
   const fraisRepas = calculFraisRepas();
   const autresFrais = calculAutresFrais();
+  const mutuelle = calculMutuelle();
+  // La mutuelle 6DD est une déduction séparée (pas dans la case 1AK)
+  // La mutuelle Madelin est hors frais réels salariaux
   const totalFraisBruts = fraisTransport + fraisRepas + autresFrais;
 
   // 4. Calcul des remboursements
@@ -1279,6 +1383,17 @@ function calc() {
   document.getElementById('d-revenu-par-part').textContent = fmt(revenuParPart);
   document.getElementById('d-tranche').textContent = tranche;
 
+  // Mutuelle — ligne dans le détail
+  const dMutuelle = document.getElementById('d-mutuelle');
+  if (mutuelle.deductible > 0) {
+    dMutuelle.style.display = 'flex';
+    document.getElementById('d-mutuelle-label').textContent =
+      `Mutuelle déductible (case ${mutuelle.case} · ${mutuelle.formulaire})`;
+    document.getElementById('d-mutuelle-val').textContent = fmt(mutuelle.deductible);
+  } else {
+    dMutuelle.style.display = 'none';
+  }
+
   // Verdict
   const verdictBox = document.getElementById('verdict-box');
   if (salaireBrut === 0) {
@@ -1321,6 +1436,7 @@ function exportCalculs() {
   const tranche = document.getElementById('d-tranche').textContent;
   const impotBrut = parseFloat(document.getElementById('res-impot-brut').textContent.replace(/[^0-9.-]/g, '') || 0);
   const gain = parseFloat(document.getElementById('d-gain').textContent.replace(/[^0-9.-]/g, '') || 0);
+  const mutuelle = calculMutuelle();
 
   // Type de transport
   const typeTransport = currentTransport === 'voiture' ? 'Voiture' :
@@ -1409,6 +1525,7 @@ function exportCalculs() {
     - Case 1AK (Frais de transport) : ${fmt(fraisTransport)}
     - Case 1BK (Frais de repas) : ${fmt(repasDetails.deductible)}
     - Case 1CK (Autres frais) : ${fmt(autresFrais)}
+    ${mutuelle.deductible > 0 ? `- Case ${mutuelle.case} (${mutuelle.info}) : ${fmt(mutuelle.deductible)} → Formulaire ${mutuelle.formulaire}` : '- Mutuelle : ' + mutuelle.info}
     =======================================
 
     --- DÉTAIL DES CALCULS (Règles 2026) ---
