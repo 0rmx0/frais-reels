@@ -1,0 +1,10 @@
+# Fichiers de sauvegarde / temporaires
+index.html.backup
+*.backup
+*.local
+*.log
+.DS_Store
+
+# Outils
+node_modules/
+coverage/
