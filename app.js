@@ -1,853 +1,632 @@
 // ============================================
-// CALCULATEUR FRAIS RÉELS
-// JavaScript principal - 0rmx0
+// CALCULATEUR FRAIS RÉELS — app.js (couche DOM)
+// La logique de calcul pure vit dans calculs.js (window.Calculs)
+// La configuration des barèmes vit dans config.js
 // ============================================
 
 // --- VARIABLES GLOBALES ---
+let currentYear = (typeof getLatestOfficialYear === 'function') ? getLatestOfficialYear() : 2026;
 let currentTransport = 'voiture';
 let currentRepasType = 'classique';
 let currentMutuelle = 'entreprise_fiche';
-let currentYear = 2027;
+
+const STATE_KEY = 'frais-reels-state-v1';
+const FIELD_IDS = [
+  'salaire', 'nombre_parts', 'situation',
+  'jours_ouvres', 'jours_arret', 'jours_teletravail',
+  'dist_aller', 'cv', 'energie', 'cout_abonnement', 'frais_velo',
+  'peage', 'parking', 'interets',
+  'nb_repas_classique', 'cout_repas_classique',
+  'nb_tickets', 'valeur_ticket', 'part_employeur_ticket',
+  'nb_repas_mixte', 'cout_repas_mixte', 'nb_tickets_mixte', 'valeur_ticket_mixte', 'part_employeur_ticket_mixte',
+  'frais_teletravail', 'frais_formation', 'frais_doc', 'frais_autres',
+  'remb_ik', 'remb_carburant', 'remb_mobilite', 'remb_autres',
+  'mutuelle_6dd', 'mutuelle_madelin'
+];
+const CHECKBOX_IDS = ['circonstances', 'forfait_tt', 'alloc_tt'];
+
+const $ = (id) => document.getElementById(id);
 
 // --- DOM READY ---
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
   initYearSelector();
-  initToggleGroups();
   initInputListeners();
-  calc();
+  initImport();
+  restoreState();
+  registerSW();
 });
 
-// --- INITIALISATION ---
+// --- SÉLECTEUR D'ANNÉE ---
 function initYearSelector() {
-  const years = getAvailableYears();
-  const select = document.getElementById('year-selector');
-  if (select) {
-    years.forEach(year => {
-      const option = document.createElement('option');
-      option.value = year;
-      option.textContent = FISCAL_CONFIG[year].label;
-      if (parseInt(year) === currentYear) option.selected = true;
-      select.appendChild(option);
-    });
-    select.addEventListener('change', function() {
-      currentYear = parseInt(this.value);
-      updateYearDisplay();
-      calc();
-    });
-  }
+  const select = $('year-selector');
+  if (!select) return;
+  getAvailableYears().forEach(year => {
+    const option = document.createElement('option');
+    option.value = year;
+    option.textContent = FISCAL_CONFIG[year].label;
+    select.appendChild(option);
+  });
+  select.value = String(currentYear);
+  select.addEventListener('change', function () {
+    currentYear = parseInt(this.value, 10);
+    updateYearDisplay();
+    calc();
+  });
   updateYearDisplay();
 }
 
 function updateYearDisplay() {
   const config = getConfig(currentYear);
-  const yearElements = document.querySelectorAll('[data-year-display]');
-  yearElements.forEach(el => {
-    el.textContent = config.label;
-  });
-  
-  const versionElement = document.querySelector('.footer-version');
-  if (versionElement) {
-    versionElement.textContent = `v2.0.0 · Barème ${currentYear} (revenus ${config.revenusYear})`;
+  document.querySelectorAll('[data-year-display]').forEach(el => { el.textContent = config.label; });
+  const note = $('year-note');
+  if (note) note.classList.toggle('hidden', !config.provisoire);
+  const footer = $('footer-version');
+  if (footer) {
+    footer.textContent = `v${VERSION} · Barème ${currentYear} (revenus ${config.revenusYear})` + (config.provisoire ? ' · provisoire' : '');
   }
+  // Montants affichés dans les textes d'aide
+  const fr2 = (x) => x.toFixed(2).replace('.', ',');
+  document.querySelectorAll('[data-forfait-repas]').forEach(el => { el.textContent = fr2(config.forfaitRepas); });
+  document.querySelectorAll('[data-plafond-repas]').forEach(el => { el.textContent = fr2(config.plafondRepas); });
+  document.querySelectorAll('[data-plafond-repas-max]').forEach(el => { el.textContent = fr2(config.plafondRepas - config.forfaitRepas); });
+  document.querySelectorAll('[data-plafond-employeur]').forEach(el => { el.textContent = fr2(config.plafondPartEmployeur); });
+  document.querySelectorAll('[data-forfait-tt]').forEach(el => { el.textContent = fr2(config.forfaitTeletravailJour); });
+  document.querySelectorAll('[data-plafond-tt]').forEach(el => { el.textContent = fr2(config.plafondTeletravail); });
 }
 
-function initToggleGroups() {
-  // Transport
-  document.querySelectorAll('#transport-type .toggle-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      setTransport(this.dataset.type, this);
-    });
-  });
-  
-  // Repas
-  document.querySelectorAll('#repas-type .toggle-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      setRepasType(this.dataset.type, this);
-    });
-  });
-  
-  // Mutuelle
-  document.querySelectorAll('#mutuelle-type .toggle-btn').forEach(btn => {
-    btn.addEventListener('click', function() {
-      setMutuelle(this.dataset.type, this);
-    });
-  });
-}
-
+// --- ÉCOUTE DES CHAMPS (une seule fois : plus d'handlers inline) ---
 function initInputListeners() {
-  // Ajouter des écouteurs oninput à tous les inputs
-  const inputs = document.querySelectorAll('input[type="number"], input[type="text"], select');
-  inputs.forEach(input => {
-    input.addEventListener('input', calc);
-    input.addEventListener('change', calc);
+  document.querySelectorAll('input, select').forEach(el => {
+    if (el.id === 'file-import') return;
+    el.addEventListener('input', onFieldChange);
+    el.addEventListener('change', onFieldChange);
   });
 }
 
-// --- TOGGLE CARDS ---
-function toggleCard(id) {
-  const body = document.getElementById(`body-${id}`);
-  const toggle = document.getElementById(`toggle-${id}`);
-  if (body && toggle) {
-    body.classList.toggle('open');
-    toggle.classList.toggle('open');
-  }
+function onFieldChange(e) {
+  if (e.target && e.target.id === 'forfait_tt') syncForfaitTT();
+  calc();
 }
 
-// --- SET TRANSPORT TYPE ---
+function syncForfaitTT() {
+  const tt = $('forfait_tt');
+  const field = $('frais_teletravail');
+  if (tt && field) field.disabled = tt.checked;
+}
+
+// --- CARTES PLIANTES ---
+function toggleCard(id) {
+  const body = $(`body-${id}`);
+  const toggle = $(`toggle-${id}`);
+  if (!body) return;
+  body.classList.toggle('open');
+  if (toggle) toggle.classList.toggle('open', body.classList.contains('open'));
+  const header = document.querySelector(`.card-header[aria-controls="body-${id}"]`);
+  if (header) header.setAttribute('aria-expanded', body.classList.contains('open') ? 'true' : 'false');
+}
+
+// --- TOGGLES ---
+function activateToggle(groupId, type) {
+  document.querySelectorAll(`#${groupId} .toggle-btn`).forEach(b => {
+    b.classList.toggle('active', b.dataset.type === type);
+  });
+}
+
+const CV_OPTIONS = {
+  voiture: [['', '— CV fiscaux —'], ['3', '3 CV et moins'], ['4', '4 CV'], ['5', '5 CV'], ['6', '6 CV'], ['7', '7 CV et plus']],
+  moto: [['', '— CV fiscaux —'], ['1-2', '1 ou 2 CV'], ['3-5', '3 à 5 CV'], ['5+', 'Plus de 5 CV']],
+  cyclomoteur: [['', '— sans objet —']]
+};
+
+function fillCvOptions(type) {
+  const cvSel = $('cv');
+  if (!cvSel) return;
+  const prev = cvSel.value;
+  const options = CV_OPTIONS[type] || CV_OPTIONS.voiture;
+  cvSel.innerHTML = options.map(([v, label]) => `<option value="${v}">${label}</option>`).join('');
+  if (options.some(([v]) => v === prev)) cvSel.value = prev;
+}
+
 function setTransport(type, btn) {
   currentTransport = type;
-  document.querySelectorAll('#transport-type .toggle-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  
-  document.getElementById('block-vehicule').style.display = (type === 'voiture' || type === 'moto') ? 'block' : 'none';
-  document.getElementById('block-tc').style.display = (type === 'tc') ? 'block' : 'none';
-  document.getElementById('block-velo').style.display = (type === 'velo') ? 'block' : 'none';
+  activateToggle('transport-type', type);
+  const isVehicule = (type === 'voiture' || type === 'moto' || type === 'cyclomoteur');
+  $('block-vehicule').style.display = isVehicule ? 'block' : 'none';
+  $('block-tc').style.display = (type === 'tc') ? 'block' : 'none';
+  $('block-velo').style.display = (type === 'velo') ? 'block' : 'none';
+  $('field-cv').style.display = (type === 'cyclomoteur') ? 'none' : '';
+  fillCvOptions(type);
   calc();
 }
 
-// --- SET REPAS TYPE ---
 function setRepasType(type, btn) {
   currentRepasType = type;
-  document.querySelectorAll('#repas-type .toggle-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  
-  const showClassique = (type === 'classique' || type === 'mixte');
-  const showTickets = (type === 'tickets' || type === 'mixte');
+  activateToggle('repas-type', type);
+  const showClassique = (type === 'classique');
+  const showTickets = (type === 'tickets');
   const showMixte = (type === 'mixte');
-  
-  document.getElementById('block-repas-classique').style.display = showClassique && !showMixte ? 'block' : 'none';
-  document.getElementById('block-repas-tickets').style.display = showTickets && !showMixte ? 'block' : 'none';
-  document.getElementById('block-repas-mixte').style.display = showMixte ? 'block' : 'none';
-  
+  $('block-repas-classique').style.display = showClassique ? 'block' : 'none';
+  $('block-repas-tickets').style.display = showTickets ? 'block' : 'none';
+  $('block-repas-mixte').style.display = showMixte ? 'block' : 'none';
   calc();
 }
 
-// --- SET MUTUELLE TYPE ---
 function setMutuelle(type, btn) {
   currentMutuelle = type;
-  document.querySelectorAll('#mutuelle-type .toggle-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  
-  document.getElementById('block-mutuelle-fiche').classList.toggle('hidden', type !== 'entreprise_fiche');
-  document.getElementById('block-mutuelle-6dd').classList.toggle('hidden', type !== 'entreprise_6dd');
-  document.getElementById('block-mutuelle-madelin').classList.toggle('hidden', type !== 'madelin');
-  document.getElementById('block-mutuelle-individuelle').classList.toggle('hidden', type !== 'individuelle');
+  activateToggle('mutuelle-type', type);
+  $('block-mutuelle-fiche').classList.toggle('hidden', type !== 'entreprise_fiche');
+  $('block-mutuelle-6dd').classList.toggle('hidden', type !== 'entreprise_6dd');
+  $('block-mutuelle-madelin').classList.toggle('hidden', type !== 'madelin');
+  $('block-mutuelle-individuelle').classList.toggle('hidden', type !== 'individuelle');
   calc();
 }
 
-// --- FORMAT CURRENCY ---
+// --- ÉTAT : lecture / sauvegarde / restauration / partage ---
+function readState() {
+  const f = {};
+  FIELD_IDS.forEach(id => { const el = $(id); if (el) f[id] = el.value; });
+  CHECKBOX_IDS.forEach(id => { const el = $(id); if (el) f[id] = el.checked ? 'on' : ''; });
+  return {
+    year: currentYear,
+    transport: currentTransport,
+    repasType: currentRepasType,
+    mutuelle: currentMutuelle,
+    situation: ($('situation') && $('situation').value) || 'celibataire',
+    f
+  };
+}
+
+function applyState(state) {
+  if (!state || typeof state !== 'object') return false;
+  if (state.year && FISCAL_CONFIG[state.year]) {
+    currentYear = parseInt(state.year, 10);
+    const ys = $('year-selector');
+    if (ys) ys.value = String(currentYear);
+  }
+  if (state.transport) setTransport(state.transport, null);
+  if (state.repasType) setRepasType(state.repasType, null);
+  if (state.mutuelle) setMutuelle(state.mutuelle, null);
+  if (state.situation) { const s = $('situation'); if (s) s.value = state.situation; }
+  const f = state.f || {};
+  FIELD_IDS.forEach(id => {
+    if (id === 'situation') return;
+    if (f[id] !== undefined) { const el = $(id); if (el) el.value = f[id]; }
+  });
+  CHECKBOX_IDS.forEach(id => {
+    if (f[id] !== undefined) { const el = $(id); if (el) el.checked = (f[id] === 'on' || f[id] === true); }
+  });
+  syncForfaitTT();
+  updateYearDisplay();
+  calc();
+  return true;
+}
+
+function defaultState() {
+  const f = {};
+  FIELD_IDS.forEach(id => { f[id] = ''; });
+  CHECKBOX_IDS.forEach(id => { f[id] = ''; });
+  return { year: currentYear, transport: 'voiture', repasType: 'classique', mutuelle: 'entreprise_fiche', situation: 'celibataire', f };
+}
+
+let saveTimer = null;
+function scheduleSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try { localStorage.setItem(STATE_KEY, JSON.stringify(readState())); } catch (e) { /* stockage indisponible */ }
+  }, 300);
+}
+
+function restoreState() {
+  const params = new URLSearchParams(location.search);
+  const s = params.get('s');
+  if (s) {
+    try {
+      if (applyState(JSON.parse(decodeShare(s)))) return;
+    } catch (e) { console.warn('Paramètre de partage invalide', e); }
+  }
+  try {
+    const raw = localStorage.getItem(STATE_KEY);
+    if (raw) applyState(JSON.parse(raw));
+  } catch (e) { /* état illisible */ }
+}
+
+function encodeShare(state) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(state))))
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+function decodeShare(s) {
+  const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
+  const bin = atob(b64);
+  return decodeURIComponent(bin.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+
+function copyShareLink() {
+  const url = location.origin + location.pathname + '?s=' + encodeShare(readState());
+  const btn = $('btn-share');
+  const done = () => {
+    if (!btn) return;
+    const old = btn.textContent;
+    btn.textContent = '✅ Lien copié !';
+    setTimeout(() => { btn.textContent = old; }, 2000);
+  };
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(done).catch(() => { prompt('Copie le lien :', url); });
+  } else {
+    prompt('Copie le lien :', url);
+  }
+}
+
+function resetState() {
+  if (!confirm('Effacer toutes les saisies enregistrées localement ?')) return;
+  try { localStorage.removeItem(STATE_KEY); } catch (e) {}
+  history.replaceState(null, '', location.pathname);
+  applyState(defaultState());
+}
+
+function initImport() {
+  const input = $('file-import');
+  if (!input) return;
+  input.addEventListener('change', function () {
+    const file = this.files && this.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function () {
+      try {
+        const obj = JSON.parse(reader.result);
+        const state = obj && obj.state ? obj.state : obj;
+        applyState(state);
+      } catch (e) {
+        alert('Fichier JSON invalide.');
+      }
+      input.value = '';
+    };
+    reader.readAsText(file);
+  });
+}
+
+function registerSW() {
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* mode non-PWA */ });
+  }
+}
+// --- FORMATAGE ---
 function fmt(n) {
   if (n === null || n === undefined || isNaN(n)) return '—';
-  return new Intl.NumberFormat('fr-FR', {
-    style: 'currency',
-    currency: 'EUR',
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  }).format(n);
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
-// --- FORMAT NUMBER ---
 function fmtNumber(n, decimals = 0) {
   if (n === null || n === undefined || isNaN(n)) return '—';
-  return new Intl.NumberFormat('fr-FR', {
-    minimumFractionDigits: decimals,
-    maximumFractionDigits: decimals
-  }).format(n);
+  return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(n);
 }
 
-// --- VALIDATION ---
-function validateInput(value, min = 0, max = Infinity) {
-  if (value === '' || value === null) return null;
-  const num = parseFloat(value);
-  if (isNaN(num)) return null;
-  if (num < min) return min;
-  if (num > max) return max;
-  return num;
-}
-
-// --- BARÈME FISCAL ---
-function calculImpotParTranche(revenuParPart, year) {
-  const config = getConfig(year);
-  let impot = 0;
-  let previousMax = 0;
-  
-  for (const tranche of config.tranches) {
-    if (revenuParPart > tranche.max) {
-      impot += (Math.min(revenuParPart, tranche.max) - previousMax) * tranche.rate;
-    }
-    previousMax = tranche.max;
-  }
-  
-  return impot;
-}
-
-function getTranche(revenuParPart, year) {
-  const config = getConfig(year);
-  
-  for (let i = config.tranches.length - 1; i >= 0; i--) {
-    if (revenuParPart > config.tranches[i].max) {
-      const nextTranche = config.tranches[i + 1] || { max: Infinity };
-      const rate = config.tranches[i].rate * 100;
-      return `${rate}% (${fmtNumber(config.tranches[i].max + 1)} € – ${nextTranche.max === Infinity ? '> ' : ''}${fmtNumber(nextTranche.max)} €)`;
-    }
-  }
-  return "0% (≤ " + fmtNumber(config.tranches[0].max) + " €)";
-}
-
-// --- CALCUL DES FRAIS DE REPAS ---
-function calculFraisRepas() {
-  const config = getConfig(currentYear);
-  
-  if (currentRepasType === 'classique') {
-    const nbRepas = validateInput(document.getElementById('nb_repas_classique').value, 0);
-    const coutRepas = validateInput(document.getElementById('cout_repas_classique').value, 0);
-    if (nbRepas === null || coutRepas === null) return 0;
-    return Math.max(0, coutRepas - config.forfaitRepas) * nbRepas;
-  }
-  else if (currentRepasType === 'tickets') {
-    const nbTickets = validateInput(document.getElementById('nb_tickets').value, 0);
-    const valeurTicket = validateInput(document.getElementById('valeur_ticket').value, 0);
-    const partEmployeur = validateInput(document.getElementById('part_employeur_ticket').value, 0);
-    if (nbTickets === null || valeurTicket === null || partEmployeur === null) return 0;
-    const resteCharge = valeurTicket - partEmployeur;
-    return Math.max(0, resteCharge - config.forfaitRepas) * nbTickets;
-  }
-  else { // Mixte
-    const nbRepas = validateInput(document.getElementById('nb_repas_mixte').value, 0);
-    const coutRepas = validateInput(document.getElementById('cout_repas_mixte').value, 0);
-    const nbTickets = validateInput(document.getElementById('nb_tickets_mixte').value, 0);
-    const valeurTicket = validateInput(document.getElementById('valeur_ticket_mixte').value, 0);
-    const partEmployeur = validateInput(document.getElementById('part_employeur_ticket_mixte').value, 0);
-    
-    if (nbRepas === null || coutRepas === null) return 0;
-    if (nbTickets === null || valeurTicket === null || partEmployeur === null) return Math.max(0, coutRepas - config.forfaitRepas) * nbRepas;
-    
-    const fraisRepas = Math.max(0, coutRepas - config.forfaitRepas) * nbRepas;
-    const resteCharge = valeurTicket - partEmployeur;
-    const fraisTickets = Math.max(0, resteCharge - config.forfaitRepas) * nbTickets;
-    
-    return fraisRepas + fraisTickets;
-  }
-}
-
-// --- DÉTAILS DES REPAS ---
-function getRepasDetails() {
-  const config = getConfig(currentYear);
-  
-  if (currentRepasType === 'classique') {
-    const nbRepas = document.getElementById('nb_repas_classique').value || 0;
-    const coutRepas = document.getElementById('cout_repas_classique').value || 0;
-    return {
-      type: 'Repas classiques',
-      nb: nbRepas,
-      cout: coutRepas,
-      forfait: config.forfaitRepas,
-      deductible: Math.max(0, coutRepas - config.forfaitRepas) * nbRepas,
-      resteCharge: coutRepas - config.forfaitRepas
-    };
-  }
-  else if (currentRepasType === 'tickets') {
-    const nbTickets = document.getElementById('nb_tickets').value || 0;
-    const valeurTicket = document.getElementById('valeur_ticket').value || 0;
-    const partEmployeur = document.getElementById('part_employeur_ticket').value || 0;
-    const resteCharge = valeurTicket - partEmployeur;
-    return {
-      type: 'Tickets restaurant',
-      nb: nbTickets,
-      valeur: valeurTicket,
-      partEmployeur: partEmployeur,
-      resteCharge: resteCharge,
-      forfait: config.forfaitRepas,
-      deductible: Math.max(0, resteCharge - config.forfaitRepas) * nbTickets,
-      plafondTicket: config.plafondTicket,
-      plafondEmployeur: config.plafondEmployeur
-    };
-  }
-  else { // Mixte
-    const nbRepas = document.getElementById('nb_repas_mixte').value || 0;
-    const coutRepas = document.getElementById('cout_repas_mixte').value || 0;
-    const nbTickets = document.getElementById('nb_tickets_mixte').value || 0;
-    const valeurTicket = document.getElementById('valeur_ticket_mixte').value || 0;
-    const partEmployeur = document.getElementById('part_employeur_ticket_mixte').value || 0;
-    const resteCharge = valeurTicket - partEmployeur;
-    return {
-      type: 'Mixte (Repas + Tickets)',
-      nbRepas: nbRepas,
-      coutRepas: coutRepas,
-      nbTickets: nbTickets,
-      valeurTicket: valeurTicket,
-      partEmployeur: partEmployeur,
-      resteCharge: resteCharge,
-      forfait: config.forfaitRepas,
-      deductibleRepas: Math.max(0, coutRepas - config.forfaitRepas) * nbRepas,
-      deductibleTickets: Math.max(0, resteCharge - config.forfaitRepas) * nbTickets,
-      deductible: Math.max(0, coutRepas - config.forfaitRepas) * nbRepas + Math.max(0, resteCharge - config.forfaitRepas) * nbTickets,
-      plafondTicket: config.plafondTicket,
-      plafondEmployeur: config.plafondEmployeur
-    };
-  }
-}
-
-// --- CALCUL DES FRAIS DE TRANSPORT ---
-function calculFraisTransport() {
-  const config = getConfig(currentYear);
-  const joursBureau = Math.max(0,
-    (validateInput(document.getElementById('jours_ouvres').value, 0, 366) || 0) -
-    (validateInput(document.getElementById('jours_arret').value, 0, 366) || 0) -
-    (validateInput(document.getElementById('jours_teletravail').value, 0, 366) || 0)
-  );
-  
-  if (currentTransport === 'voiture' || currentTransport === 'moto') {
-    const distAller = validateInput(document.getElementById('dist_aller').value, 0) || 0;
-    const cv = document.getElementById('cv').value;
-    const energie = document.getElementById('energie').value;
-    const kmAnnuel = joursBureau * distAller * 2; // Aller-retour
-    
-    if (!cv || distAller === 0) return 0;
-    
-    const baremeType = currentTransport === 'voiture' ? 'voiture' : 'moto';
-    const tarif = config.baremeKm[baremeType][cv] || 0;
-    const majorationElectrique = energie === 'electrique' ? 1.20 : 1;
-    const fraisKm = kmAnnuel * tarif * majorationElectrique;
-    
-    // Plafond : frais réels limités à 200 €/an si kmAnnuel <= 5000 km (voiture)
-    if (currentTransport === 'voiture' && kmAnnuel <= 5000) {
-      return Math.min(fraisKm, 200);
-    }
-    return fraisKm;
-  }
-  else if (currentTransport === 'tc') {
-    return validateInput(document.getElementById('cout_abonnement').value, 0) || 0;
-  }
-  else if (currentTransport === 'velo') {
-    return validateInput(document.getElementById('frais_velo').value, 0) || 0;
-  }
-  return 0;
-}
-
-// --- CALCUL DES AUTRES FRAIS ---
-function calculAutresFrais() {
-  return (validateInput(document.getElementById('frais_teletravail').value, 0) || 0) +
-         (validateInput(document.getElementById('frais_formation').value, 0) || 0) +
-         (validateInput(document.getElementById('frais_doc').value, 0) || 0) +
-         (validateInput(document.getElementById('frais_autres').value, 0) || 0);
-}
-
-// --- CALCUL DES REMBOURSEMENTS ---
-function calculRemboursements() {
-  return (validateInput(document.getElementById('remb_ik').value, 0) || 0) +
-         (validateInput(document.getElementById('remb_carburant').value, 0) || 0) +
-         (validateInput(document.getElementById('remb_mobilite').value, 0) || 0) +
-         (validateInput(document.getElementById('remb_autres').value, 0) || 0);
-}
-
-// --- CALCUL MUTUELLE ---
-function calculMutuelle() {
-  if (currentMutuelle === 'entreprise_6dd') {
-    const montant = validateInput(document.getElementById('mutuelle_6dd').value, 0) || 0;
-    return { deductible: montant, case: '6DD', formulaire: '2042 C', info: 'Mutuelle entreprise (non déduite fiche de paie)' };
-  }
-  if (currentMutuelle === 'madelin') {
-    const montant = validateInput(document.getElementById('mutuelle_madelin').value, 0) || 0;
-    return { deductible: montant, case: 'BIC/BNC', formulaire: '2035/2031', info: 'Loi Madelin — déduction du bénéfice imposable' };
-  }
-  return { deductible: 0, case: null, formulaire: null, info: currentMutuelle === 'entreprise_fiche' ? 'Déjà déduite sur fiche de paie' : 'Non déductible' };
-}
-
-// --- CALCUL PRINCIPAL ---
+// --- CALCUL + RENDU ---
 function calc() {
+  const state = readState();
   const config = getConfig(currentYear);
-  
-  // 1. Calcul des jours au bureau
-  const joursOuvres = validateInput(document.getElementById('jours_ouvres').value, 0, 366) || 0;
-  const joursArret = validateInput(document.getElementById('jours_arret').value, 0, 366) || 0;
-  const joursTeletravail = validateInput(document.getElementById('jours_teletravail').value, 0, 366) || 0;
-  const joursBureau = Math.max(0, joursOuvres - joursArret - joursTeletravail);
-  
-  document.getElementById('res-jours').textContent = fmtNumber(joursBureau);
-  document.getElementById('res-jours-sub').textContent = `${joursBureau} jours · ${Math.round(joursBureau * 2)} trajets`;
-  
-  // 2. Calcul automatique du kilométrage annuel
-  const distAller = validateInput(document.getElementById('dist_aller').value, 0) || 0;
-  const kmAnnuel = joursBureau * distAller * 2;
-  
-  if (document.getElementById('km_annuel')) {
-    document.getElementById('km_annuel').value = kmAnnuel;
-  }
-  document.getElementById('res-km-annuel').textContent = fmtNumber(kmAnnuel);
-  
-  // 3. Calcul des frais
-  const fraisTransport = calculFraisTransport();
-  const fraisRepas = calculFraisRepas();
-  const autresFrais = calculAutresFrais();
-  const mutuelle = calculMutuelle();
-  const totalFraisBruts = fraisTransport + fraisRepas + autresFrais;
-  
-  // 4. Calcul des remboursements
-  const remboursements = calculRemboursements();
-  const totalFraisNets = Math.max(0, totalFraisBruts - remboursements);
-  
-  // 5. Abattement forfaitaire 10%
-  const salaireBrut = validateInput(document.getElementById('salaire').value, 0) || 0;
-  const abattement10Pct = salaireBrut * config.abattementForfaitaire;
-  
-  // 6. Revenu net imposable
-  const revenuNetImposable = salaireBrut - Math.max(totalFraisNets, abattement10Pct);
-  
-  // 7. Calcul de l'impôt brut
-  const nombreParts = validateInput(document.getElementById('nombre_parts').value, 0.5) || 1;
-  const revenuParPart = revenuNetImposable / nombreParts;
-  const impotBrut = calculImpotParTranche(revenuParPart, currentYear) * nombreParts;
-  const tranche = getTranche(revenuParPart, currentYear);
-  
-  // 8. Gain/perte frais réels vs abattement
-  const gain = totalFraisNets - abattement10Pct;
-  
-  // --- AFFICHAGE DES RÉSULTATS ---
-  const typeTransport = currentTransport === 'voiture' ? 'Voiture' :
-                       currentTransport === 'moto' ? 'Moto' :
-                       currentTransport === 'tc' ? 'Transports en commun' : 'Vélo/marche';
-  const cv = document.getElementById('cv').value || '?';
-  const energie = document.getElementById('energie').value === 'electrique' ? 'Électrique (+20%)' : 'Thermique';
-  
-  // Transport
-  document.getElementById('res-transport').textContent = fmt(fraisTransport);
-  document.getElementById('res-transport-sub').textContent = currentTransport === 'voiture' ? `Voiture (${cv} CV, ${energie})` : typeTransport;
-  
-  // Repas
-  const repasDetails = getRepasDetails();
-  document.getElementById('res-repas').textContent = fmt(fraisRepas);
-  
-  if (currentRepasType === 'classique') {
-    document.getElementById('res-repas-sub').textContent = 
-      `${repasDetails.nb} repas × ${fmt(repasDetails.cout)} (Forfait: ${fmt(config.forfaitRepas)})`;
-  }
-  else if (currentRepasType === 'tickets') {
-    document.getElementById('res-repas-sub').textContent = 
-      `${repasDetails.nb} tickets × ${fmt(repasDetails.valeur)} (Reste: ${fmt(repasDetails.resteCharge)})`;
-  }
-  else {
-    document.getElementById('res-repas-sub').textContent = 
-      `${repasDetails.nbRepas} repas + ${repasDetails.nbTickets} tickets`;
-  }
-  
-  // Autres frais
-  document.getElementById('res-autres').textContent = fmt(autresFrais);
-  document.getElementById('res-autres-sub').textContent = 'Télétravail, formation, etc.';
-  
-  // Revenu net et impôt
-  document.getElementById('res-revenu-net').textContent = fmt(revenuNetImposable);
-  document.getElementById('res-impot-brut').textContent = fmt(impotBrut);
-  document.getElementById('res-impot-brut-sub').textContent = `Barème ${currentYear} · ${fmtNumber(nombreParts, 1)} part(s)`;
-  
-  // Détail des calculs
-  document.getElementById('d-total-brut').textContent = fmt(totalFraisBruts);
-  document.getElementById('d-remb').textContent = fmt(-remboursements);
-  document.getElementById('d-total-net').textContent = fmt(totalFraisNets);
-  document.getElementById('d-abattement').textContent = fmt(abattement10Pct);
-  document.getElementById('d-gain').textContent = fmt(gain);
-  document.getElementById('d-revenu-par-part').textContent = fmt(revenuParPart);
-  document.getElementById('d-tranche').textContent = tranche;
-  
-  // Mutuelle
-  const dMutuelle = document.getElementById('d-mutuelle');
-  if (mutuelle.deductible > 0) {
-    dMutuelle.style.display = 'flex';
-    document.getElementById('d-mutuelle-label').textContent = 
-      `Mutuelle déductible (case ${mutuelle.case} · ${mutuelle.formulaire})`;
-    document.getElementById('d-mutuelle-val').textContent = fmt(mutuelle.deductible);
-    document.getElementById('d-mutuelle-val').className = 'detail-value';
-  } else {
-    dMutuelle.style.display = 'none';
-  }
-  
-  // Verdict
-  const verdictBox = document.getElementById('verdict-box');
-  if (salaireBrut === 0) {
-    verdictBox.className = 'verdict neutral';
-    verdictBox.innerHTML = '<div class="verdict-icon">⏳</div><div class="verdict-text"><strong>En attente de données</strong><br>Saisis ton salaire et tes frais pour voir si les frais réels sont avantageux.</div>';
-  }
-  else if (totalFraisNets > abattement10Pct) {
-    verdictBox.className = 'verdict good';
-    verdictBox.innerHTML = `<div class="verdict-icon">✅</div><div class="verdict-text"><strong>Les frais réels sont avantageux !</strong><br>Tu économises ${fmt(gain)} par rapport à l'abattement forfaitaire de 10 % (${fmt(abattement10Pct)}).</div>`;
-  }
-  else {
-    verdictBox.className = 'verdict bad';
-    verdictBox.innerHTML = `<div class="verdict-icon">⚠️</div><div class="verdict-text"><strong>L'abattement de 10 % est préférable</strong><br>Tes frais réels (${fmt(totalFraisNets)}) sont inférieurs à l'abattement (${fmt(abattement10Pct)}). Garde le forfait automatique.</div>`;
-  }
+  const res = Calculs.compute(state, config);
+  render(state, config, res);
+  scheduleSave();
 }
 
-// --- EXPORT DES CALCULS ---
-function exportCalculs(format = 'txt') {
+function transportSub(config, res) {
+  const d = res.transport.detail;
+  if (d.type === 'tc') return 'Abonnement transports en commun';
+  if (d.type === 'velo') return 'Vélo / marche — frais réels';
+  const parts = [d.label];
+  if (d.cv) parts.push(`${d.cv} CV`);
+  parts.push(d.energie === 'electrique' ? 'électrique (+20 %)' : 'thermique');
+  if (d.bareme && d.bareme.taux) {
+    const b = d.bareme;
+    let formula = `${fmtNumber(d.kmAnnuel)} km × ${b.taux.toFixed(3).replace('.', ',')} €/km`;
+    if (b.fixe) formula += ` + ${fmtNumber(b.fixe)} €`;
+    if (b.majoration > 1) formula += ' × 1,20';
+    parts.push(formula);
+  }
+  if (d.depassement40km) parts.push(`⚠ limité à ${config.limiteKmTrajet} km/trajet`);
+  const annexes = (d.peage || 0) + (d.parking || 0) + (d.interets || 0);
+  if (annexes > 0) parts.push(`+ ${fmt(annexes)} frais annexes`);
+  return parts.join(' · ');
+}
+
+function repasSub(res) {
+  const r = res.repas;
+  if (r.type === 'tickets' && r.tickets) {
+    const t = r.tickets;
+    return `${fmtNumber(t.nb)} tickets × ${fmt(t.valeur)} − part employeur ${fmt(t.partEmployeur)} − forfait ${fmt(r.forfait)}`;
+  }
+  if (r.type === 'mixte') {
+    return `${fmtNumber(r.repas.nb)} repas (${fmt(r.repas.deductible)}) + ${fmtNumber(r.tickets.nb)} tickets (${fmt(r.tickets.deductible)})`;
+  }
+  const p = r.repas;
+  return `${fmtNumber(p.nb)} repas × ${fmt(p.cout)}${p.plafonne ? ' (plafonné à ' + fmt(r.plafond) + ')' : ''} − forfait ${fmt(r.forfait)}`;
+}
+
+function render(state, config, res) {
+  // Jours & km
+  $('res-jours').textContent = fmtNumber(res.jours.joursBureau);
+  $('res-jours-sub').textContent = `${res.jours.joursBureau} jours · ${res.jours.joursBureau * 2} trajets`;
+  const kmEl = $('km_annuel');
+  if (kmEl) kmEl.value = res.kmAnnuel ? Math.round(res.kmAnnuel) : '';
+  $('res-km-annuel').textContent = fmtNumber(res.kmAnnuel);
+  $('res-km-sub').textContent = res.transport.detail.depassement40km
+    ? `limité à ${config.limiteKmTrajet} km aller × 2 × jours`
+    : 'jours au bureau × distance aller × 2';
+
+  // Frais
+  $('res-transport').textContent = fmt(res.transport.frais);
+  $('res-transport-sub').textContent = transportSub(config, res);
+  $('res-repas').textContent = fmt(res.repas.deductible);
+  $('res-repas-sub').textContent = repasSub(res);
+  $('res-autres').textContent = fmt(res.autresFrais.total);
+  $('res-autres-sub').textContent = res.autresFrais.forfaitTT !== null
+    ? `dont forfait télétravail ${fmt(res.autresFrais.forfaitTT)}`
+    : 'Télétravail, formation, documentation, autres';
+
+  // Revenu & impôt
+  $('res-revenu-net').textContent = fmt(res.revenuNetImposable);
+  $('res-impot-brut').textContent = fmt(res.impot.impotBrut);
+  $('res-impot-brut-sub').textContent = `Barème ${currentYear} · ${fmtNumber(res.impot.nombreParts, 1)} part(s) · TMI ${res.impot.tranche}`;
+  $('res-impot-net').textContent = fmt(res.impot.impotNet);
+  $('res-impot-net-sub').textContent = `après décote ${fmt(res.impot.decote)}${res.impot.cehr > 0 ? ' + CEHR ' + fmt(res.impot.cehr) : ''} (estimation)`;
+
+  // Détails
+  $('d-total-brut').textContent = fmt(res.totalFraisBruts);
+  $('d-remb').textContent = fmt(-res.remboursements.total);
+  $('d-total-net').textContent = fmt(res.totalFraisNets);
+  $('d-abattement').textContent = fmt(res.abattement10Pct);
+  const gainEl = $('d-gain');
+  gainEl.textContent = fmt(res.gain);
+  gainEl.style.color = res.gain >= 0 ? 'var(--accent2)' : '#ff9a62';
+  $('d-revenu-par-part').textContent = fmt(res.impot.revenuParPart);
+  $('d-tranche').textContent = res.impot.tranche;
+  $('d-decote').textContent = res.impot.decote > 0 ? fmt(-res.impot.decote) : fmt(0);
+  const cehrRow = $('d-cehr-row');
+  if (cehrRow) cehrRow.style.display = res.impot.cehr > 0 ? 'flex' : 'none';
+  $('d-cehr').textContent = fmt(res.impot.cehr);
+
+  // Mutuelle
+  const dMut = $('d-mutuelle');
+  if (res.mutuelle.deductible > 0) {
+    dMut.style.display = 'flex';
+    $('d-mutuelle-label').textContent = `Mutuelle déductible (case ${res.mutuelle.case} · ${res.mutuelle.formulaire})`;
+    $('d-mutuelle-val').textContent = fmt(res.mutuelle.deductible);
+  } else {
+    dMut.style.display = 'none';
+  }
+
+  // Avertissements
+  renderWarnings(res.warnings);
+
+  // Verdict
+  const v = res.verdict;
+  const box = $('verdict-box');
+  box.className = `verdict ${v.kind}`;
+  const icon = v.kind === 'good' ? '✅' : v.kind === 'bad' ? '⚠️' : '⏳';
+  box.innerHTML = `<div class="verdict-icon">${icon}</div><div class="verdict-text"><strong></strong><br><span></span></div>`;
+  box.querySelector('strong').textContent = v.title;
+  box.querySelector('.verdict-text span').textContent = v.text;
+}
+
+function renderWarnings(warnings) {
+  const box = $('warnings');
+  const list = $('warnings-list');
+  if (!box || !list) return;
+  list.innerHTML = '';
+  if (!warnings || warnings.length === 0) {
+    box.classList.remove('visible');
+    return;
+  }
+  box.classList.add('visible');
+  warnings.forEach(w => {
+    const item = document.createElement('div');
+    item.className = `warning-item ${w.level === 'info' ? 'info' : ''}`;
+    const icon = document.createElement('span');
+    icon.className = 'warning-icon';
+    icon.textContent = w.level === 'info' ? 'ℹ️' : '⚠️';
+    const text = document.createElement('span');
+    text.textContent = w.text;
+    item.appendChild(icon);
+    item.appendChild(text);
+    list.appendChild(item);
+  });
+}
+// --- EXPORTS ---
+function isoDate() { return new Date().toISOString().slice(0, 10); } // 2026-11-04 (pas de séparateurs)
+function exportFilename(ext) { return `frais_reels_${currentYear}_${isoDate()}.${ext}`; }
+
+function download(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// Construit l'objet de données complet (unique source, partagé par TXT/JSON/CSV)
+function buildExportData() {
+  const state = readState();
   const config = getConfig(currentYear);
-  const salaireBrut = validateInput(document.getElementById('salaire').value, 0) || 0;
-  const nombreParts = validateInput(document.getElementById('nombre_parts').value, 0.5) || 1;
-  
-  const joursOuvres = validateInput(document.getElementById('jours_ouvres').value, 0, 366) || 0;
-  const joursArret = validateInput(document.getElementById('jours_arret').value, 0, 366) || 0;
-  const joursTeletravail = validateInput(document.getElementById('jours_teletravail').value, 0, 366) || 0;
-  const joursBureau = Math.max(0, joursOuvres - joursArret - joursTeletravail);
-  const distAller = validateInput(document.getElementById('dist_aller').value, 0) || 0;
-  const kmAnnuel = joursBureau * distAller * 2;
-  
-  const fraisTransport = calculFraisTransport();
-  const repasDetails = getRepasDetails();
-  const autresFrais = calculAutresFrais();
-  const totalFraisBruts = fraisTransport + repasDetails.deductible + autresFrais;
-  const remboursements = calculRemboursements();
-  const totalFraisNets = Math.max(0, totalFraisBruts - remboursements);
-  const abattement10Pct = salaireBrut * config.abattementForfaitaire;
-  const revenuNetImposable = salaireBrut - Math.max(totalFraisNets, abattement10Pct);
-  const revenuParPart = revenuNetImposable / nombreParts;
-  const tranche = getTranche(revenuParPart, currentYear);
-  const impotBrut = calculImpotParTranche(revenuParPart, currentYear) * nombreParts;
-  const gain = totalFraisNets - abattement10Pct;
-  const mutuelle = calculMutuelle();
-  
-  const verdictText = document.getElementById('verdict-box').querySelector('.verdict-text').textContent
-    .replace(/<br>/g, '\n')
-    .replace(/<strong>/g, '')
-    .replace(/<\/strong>/g, '');
-  
-  const typeTransport = currentTransport === 'voiture' ? 'Voiture' :
-                       currentTransport === 'moto' ? 'Moto' :
-                       currentTransport === 'tc' ? 'Transports en commun' : 'Vélo/marche';
-  const cv = document.getElementById('cv').value || 'Non spécifié';
-  const energie = document.getElementById('energie').value === 'electrique' ? 'Électrique (+20%)' : 'Thermique';
-  
-  const baremeType = currentTransport === 'voiture' ? 'voiture' : 'moto';
-  const tarifKm = config.baremeKm[baremeType][cv] || 0;
-  const majoration = energie === 'Électrique (+20%)' ? 1.20 : 1;
-  
-  // Données pour export
-  const data = {
+  const res = Calculs.compute(state, config);
+  return {
     metadata: {
-      calculator: 'Frais Réels v2.0.0',
+      calculator: `Calculateur Frais Réels v${VERSION}`,
       fiscalYear: currentYear,
       revenusYear: config.revenusYear,
-      exportDate: new Date().toLocaleDateString('fr-FR'),
+      baremeProvisoire: !!config.provisoire,
+      exportDate: isoDate(),
+      disclaimer: 'Simulation indicative — ne remplace pas un conseil fiscal.',
       sources: [
-        'ESCEC International: https://escec-international.com/fr/faut-il-declarer-les-tickets-restaurant-aux-impots/',
-        'impots.gouv.fr: https://www.impots.gouv.fr/particulier/questions/je-beneficie-de-tickets-restaurants-comment-calculer-mes-frais-reels-de'
+        'impots.gouv.fr — barème kilométrique, frais de repas, tickets restaurant',
+        'BOFiP — BOI-RSA-BASE-30-50-30, BOI-IR-LIQ, art. 197 et 223 sexies CGI',
+        'service-public.fr — barèmes kilométriques 2026'
       ]
     },
+    state, // réimportable via le bouton « Importer JSON »
     situation: {
-      salaireBrut: salaireBrut,
-      nombreParts: nombreParts,
-      joursOuvres: joursOuvres,
-      joursArret: joursArret,
-      joursTeletravail: joursTeletravail,
-      joursBureau: joursBureau
+      salaireBrut: res.salaire,
+      nombreParts: res.impot.nombreParts,
+      situationFamiliale: res.situation,
+      joursOuvres: res.jours.joursOuvres,
+      joursArret: res.jours.joursArret,
+      joursTeletravail: res.jours.joursTeletravail,
+      joursBureau: res.jours.joursBureau
     },
-    transport: {
-      type: currentTransport,
-      typeLabel: typeTransport,
-      cv: cv,
-      energie: energie,
-      distAller: distAller,
-      kmAnnuel: kmAnnuel,
-      tarifKm: tarifKm,
-      majorationElectrique: majoration,
-      fraisTransport: fraisTransport
-    },
-    repas: {
-      type: currentRepasType,
-      ...repasDetails,
-      forfaitRepas: config.forfaitRepas,
-      plafondTicket: config.plafondTicket,
-      plafondEmployeur: config.plafondEmployeur
-    },
-    autresFrais: {
-      teletravail: validateInput(document.getElementById('frais_teletravail').value, 0) || 0,
-      formation: validateInput(document.getElementById('frais_formation').value, 0) || 0,
-      documentation: validateInput(document.getElementById('frais_doc').value, 0) || 0,
-      autres: validateInput(document.getElementById('frais_autres').value, 0) || 0,
-      total: autresFrais
-    },
-    remboursements: {
-      ik: validateInput(document.getElementById('remb_ik').value, 0) || 0,
-      carburant: validateInput(document.getElementById('remb_carburant').value, 0) || 0,
-      mobilite: validateInput(document.getElementById('remb_mobilite').value, 0) || 0,
-      autres: validateInput(document.getElementById('remb_autres').value, 0) || 0,
-      total: remboursements
-    },
-    mutuelle: mutuelle,
+    transport: { ...res.transport.detail, fraisTransport: res.transport.frais },
+    repas: res.repas,
+    autresFrais: res.autresFrais,
+    remboursements: res.remboursements,
+    mutuelle: res.mutuelle,
     results: {
-      totalFraisBruts: totalFraisBruts,
-      totalFraisNets: totalFraisNets,
-      abattement10Pct: abattement10Pct,
-      gain: gain,
-      revenuNetImposable: revenuNetImposable,
-      revenuParPart: revenuParPart,
-      tranche: tranche,
-      impotBrut: impotBrut,
-      verdict: verdictText
+      totalFraisBruts: res.totalFraisBruts,
+      totalFraisNets: res.totalFraisNets,
+      abattement10Pct: res.abattement10Pct,
+      deductionRetenue: res.deductionRetenue,
+      gain: res.gain,
+      revenuNetImposable: res.revenuNetImposable,
+      revenuParPart: res.impot.revenuParPart,
+      tranche: res.impot.tranche,
+      impotBrut: res.impot.impotBrut,
+      decote: res.impot.decote,
+      cehr: res.impot.cehr,
+      impotNetEstime: res.impot.impotNet,
+      verdict: `${res.verdict.title} — ${res.verdict.text}`
     },
+    warnings: res.warnings.map(w => w.text),
     declaration: {
-      case1AK: fmt(fraisTransport),
-      case1BK: fmt(repasDetails.deductible),
-      case1CK: fmt(autresFrais),
-      mutuelleCase: mutuelle.deductible > 0 ? `${mutuelle.case} (${mutuelle.formulaire})` : 'Aucune'
+      case1AK_transport: fmt(res.declaration.case1AK),
+      case1BK_repas: fmt(res.declaration.case1BK),
+      case1CK_autres: fmt(res.declaration.case1CK),
+      mutuelle: res.declaration.mutuelleCase ? `${res.declaration.mutuelleCase} : ${fmt(res.declaration.mutuelleMontant)}` : res.mutuelle.info
     }
   };
-  
-  // Export selon le format
-  if (format === 'json') {
-    exportJSON(data);
-  } else if (format === 'csv') {
-    exportCSV(data);
-  } else {
-    exportTXT(data);
-  }
+}
+
+function exportCalculs(format = 'txt') {
+  const data = buildExportData();
+  if (format === 'json') exportJSON(data);
+  else if (format === 'csv') exportCSV(data);
+  else exportTXT(data);
 }
 
 function exportJSON(data) {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `frais_reels_${currentYear}_${new Date().toLocaleDateString('fr-FR')}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+  download(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }), exportFilename('json'));
 }
 
 function exportCSV(data) {
-  // Créer un format CSV lisible
-  const headers = [
-    'Catégorie',
-    'Libellé',
-    'Valeur',
-    'Unité',
-    'Case déclaration'
-  ];
-  
+  const headers = ['Catégorie', 'Libellé', 'Valeur', 'Unité', 'Case déclaration'];
   const rows = [
-    // Situation
-    ['Situation', 'Salaire brut annuel', data.situation.salaireBrut, '€', ''],
-    ['Situation', 'Nombre de parts', data.situation.nombreParts, '', ''],
+    ['Situation', 'Salaire brut annuel', data.situation.salaireBrut, '€', '1AJ'],
+    ['Situation', 'Nombre de parts fiscales', data.situation.nombreParts, '', ''],
+    ['Situation', 'Situation familiale', data.situation.situationFamiliale, '', ''],
     ['Situation', 'Jours au bureau', data.situation.joursBureau, 'jours', ''],
+    ['Situation', 'Kilométrage annuel retenu', data.transport.kmAnnuel, 'km', ''],
     ['', '', '', '', ''],
-    
-    // Transport
-    ['Transport', `Frais ${data.transport.typeLabel}`, data.transport.fraisTransport, '€', '1AK'],
-    ['Transport', 'Kilométrage annuel', data.transport.kmAnnuel, 'km', ''],
-    ['Transport', 'Tarif kilométrique', data.transport.tarifKm, '€/km', ''],
-    ['', '', '', '', ''],
-    
-    // Repas
-    ['Repas', `Type: ${data.repas.type}`, '', '', ''],
-    ['Repas', 'Frais repas déductibles', data.repas.deductible, '€', '1BK'],
-    ['', '', '', '', ''],
-    
-    // Autres frais
-    ['Autres frais', 'Télétravail', data.autresFrais.teletravail, '€', '1CK'],
-    ['Autres frais', 'Formation', data.autresFrais.formation, '€', '1CK'],
-    ['Autres frais', 'Documentation', data.autresFrais.documentation, '€', '1CK'],
-    ['Autres frais', 'Autres', data.autresFrais.autres, '€', '1CK'],
+    ['Transport', data.transport.label, data.transport.fraisTransport, '€', '1AK'],
+    ['Repas', `Type : ${data.repas.type}`, data.repas.deductible, '€', '1BK'],
     ['Autres frais', 'Total autres frais', data.autresFrais.total, '€', '1CK'],
     ['', '', '', '', ''],
-    
-    // Remboursements
-    ['Remboursements', 'Indemnités kilométriques', data.remboursements.ik, '€', ''],
-    ['Remboursements', 'Prime carburant', data.remboursements.carburant, '€', ''],
-    ['Remboursements', 'Forfait mobilités', data.remboursements.mobilite, '€', ''],
-    ['Remboursements', 'Autres', data.remboursements.autres, '€', ''],
-    ['Remboursements', 'Total remboursements', data.remboursements.total, '€', ''],
+    ['Remboursements', 'Total remboursements employeur', -data.remboursements.total, '€', ''],
     ['', '', '', '', ''],
-    
-    // Résultats
-    ['Résultats', 'Total frais bruts', data.results.totalFraisBruts, '€', ''],
-    ['Résultats', 'Total frais nets (après remboursements)', data.results.totalFraisNets, '€', ''],
-    ['Résultats', 'Abattement forfaitaire 10%', data.results.abattement10Pct, '€', ''],
-    ['Résultats', 'Gain/Perte vs abattement', data.results.gain, '€', ''],
+    ['Résultats', 'Total frais réels bruts', data.results.totalFraisBruts, '€', ''],
+    ['Résultats', 'Total frais réels nets', data.results.totalFraisNets, '€', ''],
+    ['Résultats', 'Abattement forfaitaire 10 % (borné)', data.results.abattement10Pct, '€', ''],
+    ['Résultats', 'Gain/perte vs abattement', data.results.gain, '€', ''],
     ['Résultats', 'Revenu net imposable', data.results.revenuNetImposable, '€', ''],
     ['Résultats', 'Impôt brut', data.results.impotBrut, '€', ''],
+    ['Résultats', 'Décote', -data.results.decote, '€', ''],
+    ['Résultats', 'CEHR', data.results.cehr, '€', ''],
+    ['Résultats', 'Impôt net estimé', data.results.impotNetEstime, '€', ''],
     ['Résultats', 'Tranche fiscale', data.results.tranche, '', ''],
     ['', '', '', '', ''],
-    
-    // Mutuelle
-    ['Mutuelle', data.mutuelle.info, data.mutuelle.deductible, '€', data.mutuelle.case || ''],
+    ['Déclaration', 'Case 1AK (transport)', data.declaration.case1AK_transport, '', '1AK'],
+    ['Déclaration', 'Case 1BK (repas)', data.declaration.case1BK_repas, '', '1BK'],
+    ['Déclaration', 'Case 1CK (autres frais)', data.declaration.case1CK_autres, '', '1CK'],
+    ['Déclaration', 'Mutuelle', data.declaration.mutuelle, '', ''],
     ['', '', '', '', ''],
-    
-    // Conseils
     ['Conseil', data.results.verdict, '', '', '']
   ];
-  
   let csv = headers.join(';') + '\n';
   rows.forEach(row => {
     csv += row.map(cell => {
-      if (cell === null || cell === undefined) return '';
-      const str = String(cell).replace(/"/g, '""');
-      return str.includes(';') || str.includes('\n') || str.includes('"') ? `"${str}"` : str;
+      const str = String(cell ?? '');
+      const esc = str.replace(/"/g, '""');
+      return /[;"\n]/.test(str) ? `"${esc}"` : esc;
     }).join(';') + '\n';
   });
-  
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `frais_reels_${currentYear}_${new Date().toLocaleDateString('fr-FR')}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  download(new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' }), exportFilename('csv'));
 }
 
 function exportTXT(data) {
-  const config = getConfig(currentYear);
-  
-  const detail = `
-    =======================================
-    DÉCLARATION D'IMPÔT SUR LE REVENU ${currentYear}
-    (Revenus ${config.revenusYear} - Frais Réels v2.0)
-    =======================================
-    Sources :
-    - ESCEC International : https://escec-international.com/fr/faut-il-declarer-les-tickets-restaurant-aux-impots/
-    - impots.gouv.fr : https://www.impots.gouv.fr/particulier/questions/je-beneficie-de-tickets-restaurants-comment-calculer-mes-frais-reels-de
-
-    --- SITUATION FISCALE ---
-    Salaire brut annuel : ${fmt(data.situation.salaireBrut)}
-    Nombre de parts fiscales : ${fmtNumber(data.situation.nombreParts, 1)}
-    Jours ouvrés : ${data.situation.joursOuvres}
-    Jours en arrêt maladie : ${data.situation.joursArret}
-    Jours en télétravail : ${data.situation.joursTeletravail}
-    Jours au bureau : ${data.situation.joursBureau} (${Math.round(data.situation.joursBureau * 2)} trajets)
-    Kilométrage annuel : ${data.transport.kmAnnuel} km
-
-    --- DÉTAIL DES FRAIS DÉDUCTIBLES (Case 1AK, 1BK, 1CK) ---
-    
-    1. Frais de transport (Case 1AK) :
-    Type : ${data.transport.typeLabel}
-    ${data.transport.type === 'voiture' || data.transport.type === 'moto' ? `CV : ${data.transport.cv}
-    Énergie : ${data.transport.energie}
-    Distance aller : ${data.transport.distAller} km
-    Tarif kilométrique : ${fmt(data.transport.tarifKm)}/km
-    Majoration électrique : ${data.transport.majorationElectrique === 1.20 ? 'Oui (+20%)' : 'Non'}` : ''}
-    Montant : ${fmt(data.transport.fraisTransport)}
-
-    2. Frais de repas (Case 1BK) :
-    ${data.repas.type === 'Repas classiques' ? `
-    Type : ${data.repas.type}
-    Nombre de repas : ${data.repas.nb}
-    Coût moyen par repas : ${fmt(data.repas.cout)}
-    Forfait déductible : ${fmt(config.forfaitRepas)}
-    Déductible : ${fmt(data.repas.deductible)}` : ''}
-    
-    ${data.repas.type === 'Tickets restaurant' ? `
-    Type : ${data.repas.type}
-    Nombre de tickets : ${data.repas.nb}
-    Valeur faciale : ${fmt(data.repas.valeur)}
-    Part employeur : ${fmt(data.repas.partEmployeur)}
-    Reste à charge : ${fmt(data.repas.resteCharge)}
-    Forfait déductible : ${fmt(config.forfaitRepas)}
-    Plafond ticket : ${fmt(config.plafondTicket)}
-    Plafond employeur : ${fmt(config.plafondEmployeur)}
-    Déductible : ${fmt(data.repas.deductible)}` : ''}
-    
-    ${data.repas.type === 'Mixte (Repas + Tickets)' ? `
-    Type : ${data.repas.type}
-    
-    Repas classiques :
-    - Nombre : ${data.repas.nbRepas}
-    - Coût moyen : ${fmt(data.repas.coutRepas)}
-    - Déductible : ${fmt(data.repas.deductibleRepas)}
-    
-    Tickets restaurant :
-    - Nombre : ${data.repas.nbTickets}
-    - Valeur faciale : ${fmt(data.repas.valeurTicket)}
-    - Part employeur : ${fmt(data.repas.partEmployeur)}
-    - Reste à charge : ${fmt(data.repas.resteCharge)}
-    - Déductible : ${fmt(data.repas.deductibleTickets)}
-    
-    Total déductible : ${fmt(data.repas.deductible)}` : ''}
-
-    3. Autres frais professionnels (Case 1CK) :
-    Télétravail : ${fmt(data.autresFrais.teletravail)}
-    Formation : ${fmt(data.autresFrais.formation)}
-    Documentation : ${fmt(data.autresFrais.documentation)}
-    Autres : ${fmt(data.autresFrais.autres)}
-    Total : ${fmt(data.autresFrais.total)}
-
-    Total frais réels bruts : ${fmt(data.results.totalFraisBruts)}
-
-    --- REMBOURSEMENTS EMPLOYEUR ---
-    Indemnités kilométriques : ${fmt(data.remboursements.ik)}
-    Prime carburant / mobilité : ${fmt(data.remboursements.carburant)}
-    Forfait mobilités durables : ${fmt(data.remboursements.mobilite)}
-    Autres remboursements : ${fmt(data.remboursements.autres)}
-    Total remboursements : ${fmt(data.remboursements.total)}
-
-    Total frais réels nets : ${fmt(data.results.totalFraisNets)}
-
-    --- COMPARAISON AVEC L'ABATTEMENT FORFAITAIRE ---
-    Abattement forfaitaire 10 % : ${fmt(data.results.abattement10Pct)}
-    Gain/Perte avec frais réels : ${fmt(data.results.gain)} ${data.results.gain > 0 ? '(Économie)' : '(Moins avantageux)'}
-
-    --- CALCUL DE L'IMPÔT (Barème ${currentYear}) ---
-    Revenu net imposable : ${fmt(data.results.revenuNetImposable)}
-    Revenu par part : ${fmt(data.results.revenuParPart)}
-    Tranche fiscale appliquée : ${data.results.tranche}
-    Impôt brut : ${fmt(data.results.impotBrut)}
-
-    --- CONSEIL ---
-    ${data.results.verdict}
-
-    =======================================
-    À REPORTER SUR VOTRE DÉCLARATION ${currentYear} (2042) :
-    - Case 1AK (Frais de transport) : ${fmt(data.declaration.case1AK)}
-    - Case 1BK (Frais de repas) : ${fmt(data.declaration.case1BK)}
-    - Case 1CK (Autres frais) : ${fmt(data.declaration.case1CK)}
-    ${data.mutuelle.deductible > 0 ? `- Case ${data.mutuelle.case} (${data.mutuelle.info}) : ${fmt(data.mutuelle.deductible)} → Formulaire ${data.mutuelle.formulaire}` : '- Mutuelle : ' + data.mutuelle.info}
-    =======================================
-
-    --- DÉTAIL DES CALCULS (Règles ${currentYear}) ---
-    1. Jours au bureau = Jours ouvrés (${data.situation.joursOuvres}) - Arrêts maladie (${data.situation.joursArret}) - Télétravail (${data.situation.joursTeletravail}) = ${data.situation.joursBureau} jours
-    2. Kilométrage annuel = Jours au bureau (${data.situation.joursBureau}) × Distance aller (${data.transport.distAller} km) × 2 = ${data.transport.kmAnnuel} km
-    3. Frais de transport = ${data.transport.kmAnnuel} km × ${fmt(data.transport.tarifKm)}/km ${data.transport.majorationElectrique > 1 ? '× ' + data.transport.majorationElectrique : ''} = ${fmt(data.transport.fraisTransport)}
-    
-    4. Frais de repas :
-    ${data.repas.type === 'Repas classiques' ? `
-       - Repas classiques : (${fmt(data.repas.cout)} - ${fmt(config.forfaitRepas)}) × ${data.repas.nb} = ${fmt(data.repas.deductible)}` : ''}
-    ${data.repas.type === 'Tickets restaurant' ? `
-       - Tickets restaurant : (${fmt(data.repas.valeur)} - ${fmt(data.repas.partEmployeur)} - ${fmt(config.forfaitRepas)}) × ${data.repas.nb} = ${fmt(data.repas.deductible)}
-       - Reste à charge : ${fmt(data.repas.resteCharge)} (${data.repas.resteCharge > config.forfaitRepas ? 'Déductible' : 'Non déductible'})` : ''}
-    ${data.repas.type === 'Mixte (Repas + Tickets)' ? `
-       - Repas classiques : (${fmt(data.repas.coutRepas)} - ${fmt(config.forfaitRepas)}) × ${data.repas.nbRepas} = ${fmt(data.repas.deductibleRepas)}
-       - Tickets restaurant : (${fmt(data.repas.valeurTicket)} - ${fmt(data.repas.partEmployeur)} - ${fmt(config.forfaitRepas)}) × ${data.repas.nbTickets} = ${fmt(data.repas.deductibleTickets)}
-       - Total : ${fmt(data.repas.deductible)}` : ''}
-
-    5. Total frais réels nets = (${fmt(data.results.totalFraisBruts)} - ${fmt(data.remboursements.total)}) = ${fmt(data.results.totalFraisNets)}
-    6. Revenu net imposable = ${fmt(data.situation.salaireBrut)} - max(${fmt(data.results.totalFraisNets)}, ${fmt(data.results.abattement10Pct)}) = ${fmt(data.results.revenuNetImposable)}
-    7. Impôt brut = (${fmt(data.results.revenuParPart)} → ${data.results.tranche}) × ${data.situation.nombreParts} parts = ${fmt(data.results.impotBrut)}
-
-    --- RÈGLES SPÉCIFIQUES ${currentYear} (ESCEC & impots.gouv.fr) ---
-    - Forfait repas : ${fmt(config.forfaitRepas)} (seule la partie > ${fmt(config.forfaitRepas)} est déductible).
-    - Tickets restaurant :
-      * Plafond valeur ticket : ${fmt(config.plafondTicket)} (non imposable si ≤ ce montant).
-      * Plafond part employeur : ${fmt(config.plafondEmployeur)} (non imposable si ≤ ce montant).
-      * Reste à charge = Valeur ticket - Part employeur.
-      * Déductible si reste à charge > ${fmt(config.forfaitRepas)}.
-  `;
-  
-  const blob = new Blob([detail], { type: 'text/plain' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `declaration_frais_reels_${currentYear}_${new Date().toLocaleDateString('fr-FR')}.txt`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const c = getConfig(currentYear);
+  const t = data.transport, r = data.repas, res = data.results, d = data.declaration;
+  const baremeLine = (t.bareme && t.bareme.taux)
+    ? `   Barème : ${fmtNumber(t.kmAnnuel)} km × ${t.bareme.taux.toFixed(3).replace('.', ',')} €/km${t.bareme.fixe ? ' + ' + fmtNumber(t.bareme.fixe) + ' €' : ''}${t.bareme.majoration > 1 ? ' × 1,20 (électrique)' : ''}${t.depassement40km ? ` (limité à ${c.limiteKmTrajet} km/trajet)` : ''}`
+    : '';
+  const lines = [
+    '=======================================',
+    `DÉCLARATION D'IMPÔT ${currentYear} — FICHE RÉCAPITULATIVE`,
+    `(Revenus ${c.revenusYear}${c.provisoire ? ' — BARÈME PROVISOIRE' : ''} · Frais réels v${VERSION})`,
+    '=======================================',
+    'Simulateur indicatif — ne remplace pas un conseil fiscal.',
+    'Sources : impots.gouv.fr · BOFiP · service-public.fr',
+    '',
+    '--- SITUATION ---',
+    `Salaire brut annuel (1AJ) : ${fmt(data.situation.salaireBrut)}`,
+    `Parts fiscales : ${fmtNumber(data.situation.nombreParts, 1)} · Situation : ${data.situation.situationFamiliale}`,
+    `Jours ouvrés ${data.situation.joursOuvres} − arrêts ${data.situation.joursArret} − télétravail ${data.situation.joursTeletravail} = ${data.situation.joursBureau} jours au bureau`,
+    `Kilométrage annuel retenu : ${fmtNumber(t.kmAnnuel)} km`,
+    '',
+    '--- FRAIS DÉDUCTIBLES ---',
+    `1. Transport (case 1AK) : ${fmt(t.fraisTransport)}`,
+    `   ${t.label}${t.cv ? ' · ' + t.cv + ' CV' : ''}${t.energie === 'electrique' ? ' · électrique +20 %' : ''}`,
+    baremeLine,
+    `2. Repas (case 1BK) : ${fmt(r.deductible)}  (type : ${r.type} ; forfait repas ${fmt(c.forfaitRepas)} ; plafond ${fmt(c.plafondRepas)}/repas)`,
+    `3. Autres frais (case 1CK) : ${fmt(data.autresFrais.total)}`,
+    `   Télétravail ${fmt(data.autresFrais.teletravail)} · Formation ${fmt(data.autresFrais.formation)} · Documentation ${fmt(data.autresFrais.documentation)} · Autres ${fmt(data.autresFrais.autres)}`,
+    '',
+    `Total frais bruts : ${fmt(res.totalFraisBruts)}`,
+    `− Remboursements employeur : ${fmt(-data.remboursements.total)}`,
+    `Total frais réels nets : ${fmt(res.totalFraisNets)}`,
+    '',
+    '--- COMPARAISON ABATTEMENT 10 % ---',
+    `Abattement forfaitaire 10 % (min ${fmt(c.abattementMin)}, max ${fmt(c.abattementMax)}) : ${fmt(res.abattement10Pct)}`,
+    `Gain/perte avec frais réels : ${fmt(res.gain)}`,
+    '',
+    '--- IMPÔT (barème ' + currentYear + ') ---',
+    `Revenu net imposable : ${fmt(res.revenuNetImposable)}`,
+    `Revenu par part : ${fmt(res.revenuParPart)} · Tranche : ${res.tranche}`,
+    `Impôt brut : ${fmt(res.impotBrut)}`,
+    `Décote : −${fmt(res.decote)}`,
+    res.cehr > 0 ? `CEHR : ${fmt(res.cehr)}` : null,
+    `Impôt net estimé : ${fmt(res.impotNetEstime)}`,
+    '',
+    '--- À REPORTER SUR LA 2042 ---',
+    `Case 1AK (transport) : ${d.case1AK_transport}`,
+    `Case 1BK (repas) : ${d.case1BK_repas}`,
+    `Case 1CK (autres frais) : ${d.case1CK_autres}`,
+    `Mutuelle : ${d.mutuelle}`,
+    '',
+    '--- CONSEIL ---',
+    res.verdict,
+    '',
+    ...(data.warnings.length ? ['--- AVERTISSEMENTS ---', ...data.warnings.map(w => '• ' + w), ''] : []),
+    `Généré le ${data.metadata.exportDate} — https://github.com/0rmx0/frais-reels`
+  ].filter(l => l !== null);
+  download(new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' }), `declaration_frais_reels_${currentYear}_${isoDate()}.txt`);
 }
 
-// --- EXPORT MENU ---
+// --- MENU D'EXPORT ---
 function showExportMenu() {
-  const menu = document.getElementById('export-menu');
-  if (menu) {
-    menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
-  }
+  const menu = $('export-menu');
+  if (menu) menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
 }
 
-// Fermer le menu d'export si on clique ailleurs
-document.addEventListener('click', function(e) {
-  const menu = document.getElementById('export-menu');
+// Ferme le menu d'export au clic ailleurs
+document.addEventListener('click', function (e) {
+  const menu = $('export-menu');
   const btn = document.querySelector('.export-dropdown-btn');
   if (menu && btn && !menu.contains(e.target) && !btn.contains(e.target)) {
     menu.style.display = 'none';
