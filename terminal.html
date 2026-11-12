@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RMX-TERM ─ Calculateur Frais Réels</title>
+<style>
+  @font-face {
+    font-family: 'HelpMe';
+    src: url('fonts/HelpMe.woff2') format('woff2');
+    font-weight: normal;
+    font-style: normal;
+  }
+
+  :root {
+    --rmx-term-fond:   #0a0f0a;
+    --rmx-term-texte:  #33ff66;
+    --rmx-term-halo:   0 0 6px rgba(51, 255, 102, 0.55);
+    --rmx-term-taille: clamp(9px, 1.55vw, 16px);
+    --rmx-term-gris:   rgba(51, 255, 102, 0.45);
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: var(--rmx-term-fond);
+    color: var(--rmx-term-texte);
+    font-family: 'HelpMe', 'Courier New', monospace;
+  }
+
+  ::selection { background: var(--rmx-term-texte); color: var(--rmx-term-fond); }
+
+  #terminal {
+    position: fixed;
+    inset: 0;
+    padding: 1.2em;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-size: var(--rmx-term-taille);
+    line-height: 1.25;
+    text-shadow: var(--rmx-term-halo);
+    scrollbar-width: thin;
+    scrollbar-color: var(--rmx-term-texte) var(--rmx-term-fond);
+  }
+  #terminal::-webkit-scrollbar { width: 6px; }
+  #terminal::-webkit-scrollbar-thumb { background: var(--rmx-term-texte); }
+  #terminal::-webkit-scrollbar-track { background: var(--rmx-term-fond); }
+
+  .ecran { max-width: 1100px; margin: 0 auto; }
+
+  pre {
+    margin: 0 0 1.6em;
+    font-family: inherit;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .curseur::after {
+    content: '█';
+    animation: rmx-blink 1s steps(1) infinite;
+  }
+  @keyframes rmx-blink { 50% { opacity: 0; } }
+
+  h1, h2, h3 { font-weight: normal; margin: 0; text-shadow: var(--rmx-term-halo); }
+
+  .titre-sep {
+    display: flex;
+    align-items: center;
+    gap: .6em;
+    margin: 1.8em 0 .8em;
+    letter-spacing: .12em;
+  }
+  .titre-sep::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid var(--rmx-term-gris);
+  }
+
+  .colonnes {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 2em;
+    align-items: start;
+  }
+  @media (max-width: 940px) { .colonnes { grid-template-columns: 1fr; } }
+
+  .zone-resultats { position: sticky; top: 1.2em; }
+  @media (max-width: 940px) { .zone-resultats { position: static; } }
+
+  .champ { display: flex; align-items: center; gap: .6em; margin: .45em 0; }
+  .champ label { flex: 0 1 auto; }
+  .pointes { flex: 1; border-bottom: 1px dotted var(--rmx-term-gris); min-width: 1.5em; }
+
+  input[type="number"], select {
+    width: 11em;
+    flex: 0 0 auto;
+    background: transparent;
+    border: 1px solid var(--rmx-term-gris);
+    color: var(--rmx-term-texte);
+    font: inherit;
+    line-height: 1.25;
+    padding: .25em .5em;
+    text-shadow: var(--rmx-term-halo);
+    outline: none;
+    -moz-appearance: textfield;
+  }
+  input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; }
+  input:focus, select:focus { border-color: var(--rmx-term-texte); background: rgba(51, 255, 102, 0.07); }
+  input[readonly] { opacity: .55; cursor: not-allowed; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 1.6em;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2333ff66' fill='none'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right .5em center;
+  }
+  option { background: var(--rmx-term-fond); color: var(--rmx-term-texte); }
+
+  .groupe-boutons { display: flex; flex-wrap: wrap; gap: .6em; margin: .6em 0; }
+  .btn {
+    background: transparent;
+    border: 1px solid var(--rmx-term-gris);
+    color: var(--rmx-term-texte);
+    font: inherit;
+    line-height: 1.25;
+    padding: .25em .8em;
+    cursor: pointer;
+    text-shadow: var(--rmx-term-halo);
+  }
+  .btn::before { content: '[ '; }
+  .btn::after { content: ' ]'; }
+  .btn:hover, .btn:focus { background: rgba(51, 255, 102, 0.12); }
+  .btn.actif { background: var(--rmx-term-texte); color: var(--rmx-term-fond); text-shadow: none; }
+
+  .cache { display: none; }
+
+  .bloc-resultats {
+    border: 1px solid var(--rmx-term-gris);
+    padding: 1em 1.2em;
+  }
+  .ligne-res { display: flex; align-items: baseline; gap: .6em; margin: .4em 0; }
+  .ligne-res .pointes { transform: translateY(-.2em); }
+  .ligne-res strong { font-weight: normal; font-size: 1.2em; }
+  .sous-ligne { margin: -.2em 0 .5em; opacity: .6; font-size: .85em; }
+
+  .verdict { border: 1px solid var(--rmx-term-gris); padding: .8em 1em; margin-top: 1.2em; }
+  .verdict-titre { letter-spacing: .08em; }
+  .verdict-text { opacity: .8; }
+
+  .pied {
+    margin-top: 2.5em;
+    padding-top: 1em;
+    border-top: 1px solid var(--rmx-term-gris);
+    opacity: .8;
+  }
+  .pied a { color: var(--rmx-term-texte); }
+  .pied .couches { opacity: .5; word-break: break-all; margin-top: .6em; }
+
+  .annee-selecteur { margin: .4em 0 0; }
+</style>
+</head>
+<body>
+<div id="terminal">
+<div class="ecran">
+
+<pre>RMX-TERM v2.0.0 ─ CALCULATEUR DE FRAIS RÉELS ─ IMPÔTS FRANCE
+Chargement du barème <span data-year-display>2027 (revenus 2026)</span> ......... OK
+Session ████████ · Licence MIT · Navigation libre (souris / clavier)<span class="curseur"></span></pre>
+
+<div class="annee-selecteur champ">
+  <label>ANNÉE FISCALE</label><span class="pointes"></span>
+  <select id="year-selector"></select>
+</div>
+
+<div class="colonnes">
+<div class="zone-saisie">
+
+  <h2 class="titre-sep">── 1. SITUATION FISCALE</h2>
+  <div class="champ">
+    <label>SALAIRE BRUT ANNUEL (EUR)</label><span class="pointes"></span>
+    <input type="number" id="salaire" placeholder="ex: 42000">
+  </div>
+  <div class="champ">
+    <label>NOMBRE DE PARTS FISCALES</label><span class="pointes"></span>
+    <input type="number" id="nombre_parts" placeholder="ex: 2" step="0.5">
+  </div>
+  <div class="sous-ligne">1 (célibataire) · 2 (couple) · 2,5 (1 enfant) · 3 (2 enfants)...</div>
+
+  <h2 class="titre-sep">── 2. EMPLOI &amp; PRÉSENCE</h2>
+  <div class="champ">
+    <label>JOURS OUVRÉS DANS L'ANNÉE</label><span class="pointes"></span>
+    <input type="number" id="jours_ouvres" placeholder="ex: 228">
+  </div>
+  <div class="champ">
+    <label>JOURS EN ARRÊT MALADIE</label><span class="pointes"></span>
+    <input type="number" id="jours_arret" placeholder="ex: 0">
+  </div>
+  <div class="champ">
+    <label>JOURS EN TÉLÉTRAVAIL</label><span class="pointes"></span>
+    <input type="number" id="jours_teletravail" placeholder="ex: 45">
+  </div>
+  <div class="sous-ligne">Jours au bureau = Jours ouvrés − Arrêts maladie − Télétravail.</div>
+
+  <h2 class="titre-sep">── 3. TRANSPORT DOMICILE ↔ TRAVAIL</h2>
+  <div class="groupe-boutons" id="transport-type">
+    <button type="button" class="btn actif" data-type="voiture">VOITURE</button>
+    <button type="button" class="btn" data-type="moto">MOTO</button>
+    <button type="button" class="btn" data-type="tc">TRANSPORTS EN COMMUN</button>
+    <button type="button" class="btn" data-type="velo">VÉLO / MARCHE</button>
+  </div>
+
+  <div id="block-vehicule">
+    <div class="champ">
+      <label>DISTANCE ALLER DOMICILE → TRAVAIL (KM)</label><span class="pointes"></span>
+      <input type="number" id="dist_aller" placeholder="ex: 22">
+    </div>
+    <div class="champ">
+      <label>PUISSANCE FISCALE (CV)</label><span class="pointes"></span>
+      <select id="cv">
+        <option value="">— CV fiscaux —</option>
+        <option value="3">3 CV et moins</option>
+        <option value="4">4 CV</option>
+        <option value="5">5 CV</option>
+        <option value="6">6 CV</option>
+        <option value="7">7 CV et plus</option>
+      </select>
+    </div>
+    <div class="champ">
+      <label>ÉNERGIE DU VÉHICULE</label><span class="pointes"></span>
+      <select id="energie">
+        <option value="">— Énergie —</option>
+        <option value="thermique">Essence / Diesel / Hybride</option>
+        <option value="electrique">Électrique / Hydrogène (+20%)</option>
+      </select>
+    </div>
+    <div class="champ">
+      <label>KILOMÉTRAGE ANNUEL (CALCULÉ)</label><span class="pointes"></span>
+      <input type="number" id="km_annuel" placeholder="automatique" readonly>
+    </div>
+  </div>
+
+  <div id="block-tc" class="cache">
+    <div class="champ">
+      <label>COÛT ANNUEL ABONNEMENT (EUR)</label><span class="pointes"></span>
+      <input type="number" id="cout_abonnement" placeholder="ex: 800">
+    </div>
+  </div>
+
+  <div id="block-velo" class="cache">
+    <div class="champ">
+      <label>FRAIS DIVERS — ENTRETIEN, ÉQUIPEMENT (EUR)</label><span class="pointes"></span>
+      <input type="number" id="frais_velo" placeholder="ex: 200">
+    </div>
+  </div>
+
+  <h2 class="titre-sep">── 4. FRAIS DE REPAS</h2>
+  <div class="groupe-boutons" id="repas-type">
+    <button type="button" class="btn actif" data-type="classique">REPAS CLASSIQUES</button>
+    <button type="button" class="btn" data-type="tickets">TICKETS RESTAURANT</button>
+    <button type="button" class="btn" data-type="mixte">MIXTE</button>
+  </div>
+
+  <div id="block-repas-classique">
+    <div class="champ">
+      <label>NOMBRE DE REPAS PROFESSIONNELS / AN</label><span class="pointes"></span>
+      <input type="number" id="nb_repas_classique" placeholder="ex: 200">
+    </div>
+    <div class="champ">
+      <label>COÛT MOYEN PAR REPAS (EUR)</label><span class="pointes"></span>
+      <input type="number" id="cout_repas_classique" placeholder="ex: 10.00" step="0.01">
+    </div>
+  </div>
+
+  <div id="block-repas-tickets" class="cache">
+    <div class="champ">
+      <label>NOMBRE DE TICKETS / AN</label><span class="pointes"></span>
+      <input type="number" id="nb_tickets" placeholder="ex: 200">
+    </div>
+    <div class="champ">
+      <label>VALEUR FACIALE DU TICKET (EUR)</label><span class="pointes"></span>
+      <input type="number" id="valeur_ticket" placeholder="ex: 8.38" step="0.01">
+    </div>
+    <div class="champ">
+      <label>PART EMPLOYEUR PAR TICKET (EUR)</label><span class="pointes"></span>
+      <input type="number" id="part_employeur_ticket" placeholder="ex: 5.92" step="0.01">
+    </div>
+  </div>
+
+  <div id="block-repas-mixte" class="cache">
+    <div class="champ">
+      <label>NOMBRE DE REPAS CLASSIQUES / AN</label><span class="pointes"></span>
+      <input type="number" id="nb_repas_mixte" placeholder="ex: 100">
+    </div>
+    <div class="champ">
+      <label>COÛT MOYEN PAR REPAS (EUR)</label><span class="pointes"></span>
+      <input type="number" id="cout_repas_mixte" placeholder="ex: 10.00" step="0.01">
+    </div>
+    <div class="champ">
+      <label>NOMBRE DE TICKETS / AN</label><span class="pointes"></span>
+      <input type="number" id="nb_tickets_mixte" placeholder="ex: 100">
+    </div>
+    <div class="champ">
+      <label>VALEUR FACIALE DU TICKET (EUR)</label><span class="pointes"></span>
+      <input type="number" id="valeur_ticket_mixte" placeholder="ex: 8.38" step="0.01">
+    </div>
+    <div class="champ">
+      <label>PART EMPLOYEUR PAR TICKET (EUR)</label><span class="pointes"></span>
+      <input type="number" id="part_employeur_ticket_mixte" placeholder="ex: 5.92" step="0.01">
+    </div>
+  </div>
+
+  <div class="sous-ligne">Règles <span data-year-display>2027</span> — forfait repas 5,45 EUR · plafond ticket 8,38 EUR · part employeur max 5,92 EUR · reste à charge > 5,45 EUR = déductible. Sources : ESCEC International &amp; impots.gouv.fr</div>
+
+  <h2 class="titre-sep">── 5. AUTRES FRAIS PROFESSIONNELS</h2>
+  <div class="champ">
+    <label>FRAIS DE TÉLÉTRAVAIL (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="frais_teletravail" placeholder="ex: 300">
+  </div>
+  <div class="champ">
+    <label>FRAIS DE FORMATION (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="frais_formation" placeholder="ex: 200">
+  </div>
+  <div class="champ">
+    <label>FRAIS DE DOCUMENTATION (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="frais_doc" placeholder="ex: 100">
+  </div>
+  <div class="champ">
+    <label>AUTRES FRAIS (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="frais_autres" placeholder="ex: 0">
+  </div>
+
+  <h2 class="titre-sep">── 6. REMBOURSEMENTS EMPLOYEUR</h2>
+  <div class="champ">
+    <label>INDEMNITÉS KILOMÉTRIQUES REÇUES (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="remb_ik" placeholder="ex: 0">
+  </div>
+  <div class="champ">
+    <label>PRIME CARBURANT / MOBILITÉ (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="remb_carburant" placeholder="ex: 0">
+  </div>
+  <div class="champ">
+    <label>FORFAIT MOBILITÉS DURABLES (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="remb_mobilite" placeholder="ex: 0">
+  </div>
+  <div class="champ">
+    <label>AUTRES REMBOURSEMENTS PRO (EUR/AN)</label><span class="pointes"></span>
+    <input type="number" id="remb_autres" placeholder="ex: 0">
+  </div>
+  <div class="sous-ligne">Ces remboursements sont soustraits de tes frais réels. Seul le net déductible compte.</div>
+
+  <h2 class="titre-sep">── 7. MUTUELLE SANTÉ</h2>
+  <div class="groupe-boutons" id="mutuelle-type">
+    <button type="button" class="btn actif" data-type="entreprise_fiche">ENTREPRISE (DÉDUITE FICHE DE PAIE)</button>
+    <button type="button" class="btn" data-type="entreprise_6dd">ENTREPRISE (NON DÉDUITE)</button>
+    <button type="button" class="btn" data-type="madelin">TNS / MADELIN</button>
+    <button type="button" class="btn" data-type="individuelle">INDIVIDUELLE</button>
+  </div>
+
+  <div id="block-mutuelle-fiche">
+    <div class="sous-ligne">Rien à faire : ta part salariale est déjà soustraite de ton salaire imposable via ta fiche de paie.</div>
+  </div>
+
+  <div id="block-mutuelle-6dd" class="cache">
+    <div class="champ">
+      <label>PART SALARIALE ANNUELLE (EUR)</label><span class="pointes"></span>
+      <input type="number" id="mutuelle_6dd" placeholder="ex: 480">
+    </div>
+    <div class="sous-ligne">À reporter en case 6DD du formulaire 2042 C. Ton employeur doit te communiquer ce montant.</div>
+  </div>
+
+  <div id="block-mutuelle-madelin" class="cache">
+    <div class="champ">
+      <label>COTISATIONS MADELIN ANNUELLES (EUR)</label><span class="pointes"></span>
+      <input type="number" id="mutuelle_madelin" placeholder="ex: 1200">
+    </div>
+    <div class="sous-ligne">Cotisations déductibles du bénéfice imposable (BIC/BNC) — à déclarer en 2035/2031.</div>
+  </div>
+
+  <div id="block-mutuelle-individuelle" class="cache">
+    <div class="sous-ligne">Non déductible : les cotisations d'une mutuelle individuelle ne sont pas déductibles.</div>
+  </div>
+
+</div>
+
+<div class="zone-resultats">
+  <div class="bloc-resultats">
+    <h3>┌── RÉSULTAT DU CALCUL ──</h3>
+    <div class="sous-ligne">Mis à jour en temps réel · <span data-year-display>Barème 2027</span></div>
+
+    <div class="ligne-res"><label>JOURS AU BUREAU</label><span class="pointes"></span><strong id="res-jours">—</strong></div>
+    <div class="sous-ligne" id="res-jours-sub"></div>
+
+    <div class="ligne-res"><label>KILOMÉTRAGE ANNUEL</label><span class="pointes"></span><strong id="res-km-annuel">—</strong></div>
+    <div class="sous-ligne">Calculé automatiquement</div>
+
+    <div class="ligne-res"><label>FRAIS TRANSPORT</label><span class="pointes"></span><strong id="res-transport">—</strong></div>
+    <div class="sous-ligne" id="res-transport-sub"></div>
+
+    <div class="ligne-res"><label>FRAIS REPAS</label><span class="pointes"></span><strong id="res-repas">—</strong></div>
+    <div class="sous-ligne" id="res-repas-sub"></div>
+
+    <div class="ligne-res"><label>AUTRES FRAIS</label><span class="pointes"></span><strong id="res-autres">—</strong></div>
+    <div class="sous-ligne" id="res-autres-sub">Télétravail, formation, etc.</div>
+
+    <div class="ligne-res"><label>REVENU NET IMPOSABLE</label><span class="pointes"></span><strong id="res-revenu-net">—</strong></div>
+    <div class="sous-ligne">Après déduction des frais réels ou abattement 10%</div>
+
+    <div class="ligne-res"><label>IMPÔT BRUT <span data-year-display>2027</span></label><span class="pointes"></span><strong id="res-impot-brut">—</strong></div>
+    <div class="sous-ligne" id="res-impot-brut-sub"></div>
+
+    <h3>├── DÉTAIL</h3>
+    <div class="ligne-res"><label>TOTAL FRAIS RÉELS BRUTS</label><span class="pointes"></span><span id="d-total-brut">—</span></div>
+    <div class="ligne-res"><label>− REMBOURSEMENTS EMPLOYEUR</label><span class="pointes"></span><span id="d-remb">—</span></div>
+    <div class="ligne-res"><label>TOTAL FRAIS RÉELS NETS</label><span class="pointes"></span><strong id="d-total-net">—</strong></div>
+    <div class="ligne-res"><label>ABATTEMENT FORFAITAIRE 10 %</label><span class="pointes"></span><span id="d-abattement">—</span></div>
+    <div class="ligne-res"><label>GAIN / PERTE FRAIS RÉELS</label><span class="pointes"></span><span id="d-gain">—</span></div>
+    <div class="ligne-res" id="d-mutuelle" style="display:none">
+      <label id="d-mutuelle-label">MUTUELLE DÉDUCTIBLE</label><span class="pointes"></span><span id="d-mutuelle-val">—</span>
+    </div>
+    <div class="ligne-res"><label>REVENU PAR PART</label><span class="pointes"></span><span id="d-revenu-par-part">—</span></div>
+    <div class="ligne-res"><label>TRANCHE FISCALE APPLIQUÉE</label><span class="pointes"></span><span id="d-tranche">—</span></div>
+
+    <h3>├── EXPORT DÉCLARATION</h3>
+    <div class="groupe-boutons">
+      <button type="button" class="btn" id="export-txt">TXT — DÉCLARATION COMPLÈTE</button>
+      <button type="button" class="btn" id="export-json">JSON — DONNÉES STRUCTURÉES</button>
+      <button type="button" class="btn" id="export-csv">CSV — TABLEUR</button>
+    </div>
+
+    <div id="verdict-box" class="verdict">
+      <div class="verdict-titre">[ -- ] EN ATTENTE DE DONNÉES</div>
+      <div class="verdict-text">Saisis ton salaire et tes frais pour voir si les frais réels sont avantageux.</div>
+    </div>
+  </div>
+</div>
+
+</div>
+
+<div class="pied">
+  <div><span class="footer-version">v2.0.0 · Barème 2027 (revenus 2026)</span> · <a href="index.html">[ VERSION CLASSIQUE ]</a> · <a href="https://github.com/0rmx0/frais-reels" target="_blank" rel="noopener">[ GITHUB · 0rmx0/FRAIS-RÉELS ]</a></div>
+  <div class="couches">Y2UgcXVpIGVzdCBjYWNoZSB2YXV0IHBsdXMgcXVlIGNlIHF1aSBlc3QgdmlzaWJsZSAvLyBybXg=</div>
+</div>
+
+</div>
+</div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  var currentTransport = 'voiture';
+  var currentRepasType = 'classique';
+  var currentMutuelle = 'entreprise_fiche';
+  var currentYear = 2027;
+
+  function $(id) { return document.getElementById(id); }
+
+  function fmt(n) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency', currency: 'EUR',
+      minimumFractionDigits: 2, maximumFractionDigits: 2
+    }).format(n);
+  }
+
+  function fmtNumber(n, decimals) {
+    if (n === null || n === undefined || isNaN(n)) return '—';
+    return new Intl.NumberFormat('fr-FR', {
+      minimumFractionDigits: decimals || 0,
+      maximumFractionDigits: decimals || 0
+    }).format(n);
+  }
+
+  function validateInput(value, min, max) {
+    if (value === '' || value === null) return null;
+    var num = parseFloat(value);
+    if (isNaN(num)) return null;
+    if (num < (min || 0)) return min || 0;
+    if (num !== undefined && max !== undefined && num > max) return max;
+    return num;
+  }
+
+  function calculImpotParTranche(revenuParPart, year) {
+    var config = getConfig(year);
+    var impot = 0;
+    var previousMax = 0;
+    for (var i = 0; i < config.tranches.length; i++) {
+      var tranche = config.tranches[i];
+      if (revenuParPart > tranche.max) {
+        impot += (Math.min(revenuParPart, tranche.max) - previousMax) * tranche.rate;
+      }
+      previousMax = tranche.max;
+    }
+    return impot;
+  }
+
+  function getTranche(revenuParPart, year) {
+    var config = getConfig(year);
+    for (var i = config.tranches.length - 1; i >= 0; i--) {
+      if (revenuParPart > config.tranches[i].max) {
+        var nextTranche = config.tranches[i + 1] || { max: Infinity };
+        var rate = config.tranches[i].rate * 100;
+        return rate + '% (' + fmtNumber(config.tranches[i].max + 1) + ' € – ' +
+               (nextTranche.max === Infinity ? '> ' : '') + fmtNumber(nextTranche.max) + ' €)';
+      }
+    }
+    return '0% (≤ ' + fmtNumber(config.tranches[0].max) + ' €)';
+  }
+
+  function calculFraisRepas() {
+    var config = getConfig(currentYear);
+    if (currentRepasType === 'classique') {
+      var nbRepas = validateInput($('nb_repas_classique').value, 0);
+      var coutRepas = validateInput($('cout_repas_classique').value, 0);
+      if (nbRepas === null || coutRepas === null) return 0;
+      return Math.max(0, coutRepas - config.forfaitRepas) * nbRepas;
+    }
+    if (currentRepasType === 'tickets') {
+      var nbTickets = validateInput($('nb_tickets').value, 0);
+      var valeurTicket = validateInput($('valeur_ticket').value, 0);
+      var partEmployeur = validateInput($('part_employeur_ticket').value, 0);
+      if (nbTickets === null || valeurTicket === null || partEmployeur === null) return 0;
+      var resteCharge = valeurTicket - partEmployeur;
+      return Math.max(0, resteCharge - config.forfaitRepas) * nbTickets;
+    }
+    var nbRepasM = validateInput($('nb_repas_mixte').value, 0);
+    var coutRepasM = validateInput($('cout_repas_mixte').value, 0);
+    var nbTicketsM = validateInput($('nb_tickets_mixte').value, 0);
+    var valeurTicketM = validateInput($('valeur_ticket_mixte').value, 0);
+    var partEmployeurM = validateInput($('part_employeur_ticket_mixte').value, 0);
+    if (nbRepasM === null || coutRepasM === null) return 0;
+    var fraisRepas = Math.max(0, coutRepasM - config.forfaitRepas) * nbRepasM;
+    if (nbTicketsM === null || valeurTicketM === null || partEmployeurM === null) return fraisRepas;
+    var resteChargeM = valeurTicketM - partEmployeurM;
+    var fraisTickets = Math.max(0, resteChargeM - config.forfaitRepas) * nbTicketsM;
+    return fraisRepas + fraisTickets;
+  }
+
+  function calculFraisTransport() {
+    var config = getConfig(currentYear);
+    var joursBureau = Math.max(0,
+      (validateInput($('jours_ouvres').value, 0, 366) || 0) -
+      (validateInput($('jours_arret').value, 0, 366) || 0) -
+      (validateInput($('jours_teletravail').value, 0, 366) || 0)
+    );
+    if (currentTransport === 'voiture' || currentTransport === 'moto') {
+      var distAller = validateInput($('dist_aller').value, 0) || 0;
+      var cv = $('cv').value;
+      var energie = $('energie').value;
+      var kmAnnuel = joursBureau * distAller * 2;
+      if (!cv || distAller === 0) return 0;
+      var baremeType = currentTransport === 'voiture' ? 'voiture' : 'moto';
+      var tarif = config.baremeKm[baremeType][cv] || 0;
+      var majorationElectrique = energie === 'electrique' ? 1.20 : 1;
+      var fraisKm = kmAnnuel * tarif * majorationElectrique;
+      if (currentTransport === 'voiture' && kmAnnuel <= 5000) {
+        return Math.min(fraisKm, 200);
+      }
+      return fraisKm;
+    }
+    if (currentTransport === 'tc') {
+      return validateInput($('cout_abonnement').value, 0) || 0;
+    }
+    if (currentTransport === 'velo') {
+      return validateInput($('frais_velo').value, 0) || 0;
+    }
+    return 0;
+  }
+
+  function calculAutresFrais() {
+    return (validateInput($('frais_teletravail').value, 0) || 0) +
+           (validateInput($('frais_formation').value, 0) || 0) +
+           (validateInput($('frais_doc').value, 0) || 0) +
+           (validateInput($('frais_autres').value, 0) || 0);
+  }
+
+  function calculRemboursements() {
+    return (validateInput($('remb_ik').value, 0) || 0) +
+           (validateInput($('remb_carburant').value, 0) || 0) +
+           (validateInput($('remb_mobilite').value, 0) || 0) +
+           (validateInput($('remb_autres').value, 0) || 0);
+  }
+
+  function calculMutuelle() {
+    if (currentMutuelle === 'entreprise_6dd') {
+      var montant = validateInput($('mutuelle_6dd').value, 0) || 0;
+      return { deductible: montant, case: '6DD', formulaire: '2042 C', info: 'Mutuelle entreprise (non déduite fiche de paie)' };
+    }
+    if (currentMutuelle === 'madelin') {
+      var montantM = validateInput($('mutuelle_madelin').value, 0) || 0;
+      return { deductible: montantM, case: 'BIC/BNC', formulaire: '2035/2031', info: 'Loi Madelin — déduction du bénéfice imposable' };
+    }
+    return {
+      deductible: 0, case: null, formulaire: null,
+      info: currentMutuelle === 'entreprise_fiche' ? 'Déjà déduite sur fiche de paie' : 'Non déductible'
+    };
+  }
+
+  function calc() {
+    var config = getConfig(currentYear);
+
+    var joursOuvres = validateInput($('jours_ouvres').value, 0, 366) || 0;
+    var joursArret = validateInput($('jours_arret').value, 0, 366) || 0;
+    var joursTeletravail = validateInput($('jours_teletravail').value, 0, 366) || 0;
+    var joursBureau = Math.max(0, joursOuvres - joursArret - joursTeletravail);
+
+    $('res-jours').textContent = fmtNumber(joursBureau);
+    $('res-jours-sub').textContent = joursBureau + ' jours · ' + Math.round(joursBureau * 2) + ' trajets';
+
+    var distAller = validateInput($('dist_aller').value, 0) || 0;
+    var kmAnnuel = joursBureau * distAller * 2;
+    $('km_annuel').value = kmAnnuel;
+    $('res-km-annuel').textContent = fmtNumber(kmAnnuel);
+
+    var fraisTransport = calculFraisTransport();
+    var fraisRepas = calculFraisRepas();
+    var autresFrais = calculAutresFrais();
+    var mutuelle = calculMutuelle();
+    var totalFraisBruts = fraisTransport + fraisRepas + autresFrais;
+
+    var remboursements = calculRemboursements();
+    var totalFraisNets = Math.max(0, totalFraisBruts - remboursements);
+
+    var salaireBrut = validateInput($('salaire').value, 0) || 0;
+    var abattement10Pct = salaireBrut * config.abattementForfaitaire;
+    var revenuNetImposable = salaireBrut - Math.max(totalFraisNets, abattement10Pct);
+
+    var nombreParts = validateInput($('nombre_parts').value, 0.5) || 1;
+    var revenuParPart = revenuNetImposable / nombreParts;
+    var impotBrut = calculImpotParTranche(revenuParPart, currentYear) * nombreParts;
+    var tranche = getTranche(revenuParPart, currentYear);
+    var gain = totalFraisNets - abattement10Pct;
+
+    var typeTransport = currentTransport === 'voiture' ? 'Voiture' :
+                        currentTransport === 'moto' ? 'Moto' :
+                        currentTransport === 'tc' ? 'Transports en commun' : 'Vélo/marche';
+    var cv = $('cv').value || '?';
+    var energie = $('energie').value === 'electrique' ? 'Électrique (+20%)' : 'Thermique';
+
+    $('res-transport').textContent = fmt(fraisTransport);
+    $('res-transport-sub').textContent = currentTransport === 'voiture'
+      ? 'Voiture (' + cv + ' CV, ' + energie + ')' : typeTransport;
+
+    $('res-repas').textContent = fmt(fraisRepas);
+    if (currentRepasType === 'classique') {
+      var nbRC = $('nb_repas_classique').value || 0;
+      var coutRC = parseFloat($('cout_repas_classique').value || 0) || 0;
+      $('res-repas-sub').textContent = nbRC + ' repas × ' + fmt(coutRC) + ' (Forfait : ' + fmt(config.forfaitRepas) + ')';
+    } else if (currentRepasType === 'tickets') {
+      var nbT = $('nb_tickets').value || 0;
+      var valT = parseFloat($('valeur_ticket').value || 0) || 0;
+      var partT = parseFloat($('part_employeur_ticket').value || 0) || 0;
+      $('res-repas-sub').textContent = nbT + ' tickets × ' + fmt(valT) + ' (Reste : ' + fmt(valT - partT) + ')';
+    } else {
+      $('res-repas-sub').textContent = ($('nb_repas_mixte').value || 0) + ' repas + ' + ($('nb_tickets_mixte').value || 0) + ' tickets';
+    }
+
+    $('res-autres').textContent = fmt(autresFrais);
+    $('res-revenu-net').textContent = fmt(revenuNetImposable);
+    $('res-impot-brut').textContent = fmt(impotBrut);
+    $('res-impot-brut-sub').textContent = 'Barème ' + currentYear + ' · ' + fmtNumber(nombreParts, 1) + ' part(s)';
+
+    $('d-total-brut').textContent = fmt(totalFraisBruts);
+    $('d-remb').textContent = fmt(-remboursements);
+    $('d-total-net').textContent = fmt(totalFraisNets);
+    $('d-abattement').textContent = fmt(abattement10Pct);
+    $('d-gain').textContent = fmt(gain);
+    $('d-revenu-par-part').textContent = fmt(revenuParPart);
+    $('d-tranche').textContent = tranche;
+
+    var dMutuelle = $('d-mutuelle');
+    if (mutuelle.deductible > 0) {
+      dMutuelle.style.display = 'flex';
+      $('d-mutuelle-label').textContent = 'MUTUELLE DÉDUCTIBLE (CASE ' + mutuelle.case + ' · ' + mutuelle.formulaire + ')';
+      $('d-mutuelle-val').textContent = fmt(mutuelle.deductible);
+    } else {
+      dMutuelle.style.display = 'none';
+    }
+
+    var verdictBox = $('verdict-box');
+    if (salaireBrut === 0) {
+      verdictBox.innerHTML = '<div class="verdict-titre">[ -- ] EN ATTENTE DE DONNÉES</div>' +
+        '<div class="verdict-text">Saisis ton salaire et tes frais pour voir si les frais réels sont avantageux.</div>';
+    } else if (totalFraisNets > abattement10Pct) {
+      verdictBox.innerHTML = '<div class="verdict-titre">[ OK ] LES FRAIS RÉELS SONT AVANTAGEUX</div>' +
+        '<div class="verdict-text">Tu économises ' + fmt(gain) + ' par rapport à l\'abattement forfaitaire de 10 % (' + fmt(abattement10Pct) + ').</div>';
+    } else {
+      verdictBox.innerHTML = '<div class="verdict-titre">[ !! ] L\'ABATTEMENT DE 10 % EST PRÉFÉRABLE</div>' +
+        '<div class="verdict-text">Tes frais réels (' + fmt(totalFraisNets) + ') sont inférieurs à l\'abattement (' + fmt(abattement10Pct) + '). Garde le forfait automatique.</div>';
+    }
+  }
+
+  function setTransport(type) {
+    currentTransport = type;
+    activerBouton('transport-type', type);
+    afficher('block-vehicule', type === 'voiture' || type === 'moto');
+    afficher('block-tc', type === 'tc');
+    afficher('block-velo', type === 'velo');
+    calc();
+  }
+
+  function setRepasType(type) {
+    currentRepasType = type;
+    activerBouton('repas-type', type);
+    afficher('block-repas-classique', type === 'classique');
+    afficher('block-repas-tickets', type === 'tickets');
+    afficher('block-repas-mixte', type === 'mixte');
+    calc();
+  }
+
+  function setMutuelle(type) {
+    currentMutuelle = type;
+    activerBouton('mutuelle-type', type);
+    afficher('block-mutuelle-fiche', type === 'entreprise_fiche');
+    afficher('block-mutuelle-6dd', type === 'entreprise_6dd');
+    afficher('block-mutuelle-madelin', type === 'madelin');
+    afficher('block-mutuelle-individuelle', type === 'individuelle');
+    calc();
+  }
+
+  function activerBouton(groupeId, type) {
+    var boutons = $(groupeId).querySelectorAll('.btn');
+    for (var i = 0; i < boutons.length; i++) {
+      boutons[i].classList.toggle('actif', boutons[i].getAttribute('data-type') === type);
+    }
+  }
+
+  function afficher(id, visible) {
+    $(id).classList.toggle('cache', !visible);
+  }
+
+  function updateYearDisplay() {
+    var config = getConfig(currentYear);
+    var yearElements = document.querySelectorAll('[data-year-display]');
+    for (var i = 0; i < yearElements.length; i++) {
+      yearElements[i].textContent = config.label;
+    }
+    var versionElement = document.querySelector('.footer-version');
+    if (versionElement) {
+      versionElement.textContent = 'v2.0.0 · Barème ' + currentYear + ' (revenus ' + config.revenusYear + ')';
+    }
+  }
+
+  function initYearSelector() {
+    var years = getAvailableYears();
+    var select = $('year-selector');
+    years.forEach(function (year) {
+      var option = document.createElement('option');
+      option.value = year;
+      option.textContent = FISCAL_CONFIG[year].label;
+      if (parseInt(year, 10) === currentYear) option.selected = true;
+      select.appendChild(option);
+    });
+    select.addEventListener('change', function () {
+      currentYear = parseInt(this.value, 10);
+      updateYearDisplay();
+      calc();
+    });
+    updateYearDisplay();
+  }
+
+  function exporter(nomFichier, contenu, mimeType) {
+    var blob = new Blob([contenu], { type: mimeType });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = nomFichier;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function dateFr() { return new Date().toLocaleDateString('fr-FR'); }
+
+  function construireDonnees() {
+    var config = getConfig(currentYear);
+    var salaireBrut = validateInput($('salaire').value, 0) || 0;
+    var nombreParts = validateInput($('nombre_parts').value, 0.5) || 1;
+    var joursOuvres = validateInput($('jours_ouvres').value, 0, 366) || 0;
+    var joursArret = validateInput($('jours_arret').value, 0, 366) || 0;
+    var joursTeletravail = validateInput($('jours_teletravail').value, 0, 366) || 0;
+    var joursBureau = Math.max(0, joursOuvres - joursArret - joursTeletravail);
+    var distAller = validateInput($('dist_aller').value, 0) || 0;
+    var kmAnnuel = joursBureau * distAller * 2;
+
+    var fraisTransport = calculFraisTransport();
+    var fraisRepas = calculFraisRepas();
+    var autresFrais = calculAutresFrais();
+    var totalFraisBruts = fraisTransport + fraisRepas + autresFrais;
+    var remboursements = calculRemboursements();
+    var totalFraisNets = Math.max(0, totalFraisBruts - remboursements);
+    var abattement10Pct = salaireBrut * config.abattementForfaitaire;
+    var revenuNetImposable = salaireBrut - Math.max(totalFraisNets, abattement10Pct);
+    var revenuParPart = revenuNetImposable / nombreParts;
+    var tranche = getTranche(revenuParPart, currentYear);
+    var impotBrut = calculImpotParTranche(revenuParPart, currentYear) * nombreParts;
+    var gain = totalFraisNets - abattement10Pct;
+    var mutuelle = calculMutuelle();
+
+    var typeTransport = currentTransport === 'voiture' ? 'Voiture' :
+                        currentTransport === 'moto' ? 'Moto' :
+                        currentTransport === 'tc' ? 'Transports en commun' : 'Vélo/marche';
+    var cv = $('cv').value || 'Non spécifié';
+    var baremeType = currentTransport === 'voiture' ? 'voiture' : 'moto';
+    var tarifKm = config.baremeKm[baremeType][cv] || 0;
+
+    return {
+      metadata: {
+        calculator: 'Frais Réels v2.0.0 (terminal)',
+        fiscalYear: currentYear,
+        revenusYear: config.revenusYear,
+        exportDate: dateFr(),
+        sources: [
+          'ESCEC International: https://escec-international.com/fr/faut-il-declarer-les-tickets-restaurant-aux-impots/',
+          'impots.gouv.fr: https://www.impots.gouv.fr/particulier/questions/je-beneficie-de-tickets-restaurants-comment-calculer-mes-frais-reels-de'
+        ]
+      },
+      situation: {
+        salaireBrut: salaireBrut, nombreParts: nombreParts,
+        joursOuvres: joursOuvres, joursArret: joursArret,
+        joursTeletravail: joursTeletravail, joursBureau: joursBureau
+      },
+      transport: {
+        type: currentTransport, typeLabel: typeTransport, cv: cv,
+        energie: $('energie').value === 'electrique' ? 'Électrique (+20%)' : 'Thermique',
+        distAller: distAller, kmAnnuel: kmAnnuel, tarifKm: tarifKm,
+        fraisTransport: fraisTransport
+      },
+      repas: { type: currentRepasType, deductible: fraisRepas, forfaitRepas: config.forfaitRepas },
+      autresFrais: { total: autresFrais },
+      remboursements: { total: remboursements },
+      mutuelle: mutuelle,
+      results: {
+        totalFraisBruts: totalFraisBruts, totalFraisNets: totalFraisNets,
+        abattement10Pct: abattement10Pct, gain: gain,
+        revenuNetImposable: revenuNetImposable, revenuParPart: revenuParPart,
+        tranche: tranche, impotBrut: impotBrut
+      },
+      declaration: {
+        case1AK: fmt(fraisTransport),
+        case1BK: fmt(fraisRepas),
+        case1CK: fmt(autresFrais),
+        mutuelleCase: mutuelle.deductible > 0 ? mutuelle.case + ' (' + mutuelle.formulaire + ')' : 'Aucune'
+      }
+    };
+  }
+
+  function exportTXT() {
+    var d = construireDonnees();
+    var lignes = [
+      '=======================================',
+      "DECLARATION D'IMPOT SUR LE REVENU " + currentYear,
+      '(Revenus ' + getConfig(currentYear).revenusYear + ' - Frais Reels v2.0 - Terminal)',
+      '=======================================',
+      '',
+      '--- SITUATION FISCALE ---',
+      'Salaire brut annuel : ' + fmt(d.situation.salaireBrut),
+      'Nombre de parts fiscales : ' + fmtNumber(d.situation.nombreParts, 1),
+      'Jours au bureau : ' + d.situation.joursBureau + ' (' + Math.round(d.situation.joursBureau * 2) + ' trajets)',
+      'Kilometrage annuel : ' + d.transport.kmAnnuel + ' km',
+      '',
+      '--- DETAIL DES FRAIS DEDUCTIBLES (Cases 1AK, 1BK, 1CK) ---',
+      '1. Frais de transport (Case 1AK) : ' + fmt(d.transport.fraisTransport),
+      '   ' + d.transport.typeLabel + ' · ' + d.transport.cv + ' CV · ' + d.transport.energie,
+      '   Distance aller : ' + d.transport.distAller + ' km · Tarif : ' + fmt(d.transport.tarifKm) + '/km',
+      '2. Frais de repas (Case 1BK) : ' + fmt(d.repas.deductible),
+      '3. Autres frais professionnels (Case 1CK) : ' + fmt(d.autresFrais.total),
+      '',
+      'Total frais reels bruts : ' + fmt(d.results.totalFraisBruts),
+      'Remboursements employeur : -' + fmt(d.remboursements.total),
+      'Total frais reels nets : ' + fmt(d.results.totalFraisNets),
+      '',
+      '--- COMPARAISON AVEC L\'ABATTEMENT FORFAITAIRE ---',
+      'Abattement forfaitaire 10 % : ' + fmt(d.results.abattement10Pct),
+      'Gain/Perte avec frais reels : ' + fmt(d.results.gain),
+      '',
+      '--- CALCUL DE L\'IMPOT (Bareme ' + currentYear + ') ---',
+      'Revenu net imposable : ' + fmt(d.results.revenuNetImposable),
+      'Revenu par part : ' + fmt(d.results.revenuParPart),
+      'Tranche fiscale appliquee : ' + d.results.tranche,
+      'Impot brut : ' + fmt(d.results.impotBrut),
+      '',
+      '--- A REPORTER SUR VOTRE DECLARATION ' + currentYear + ' (2042) ---',
+      '- Case 1AK (Frais de transport) : ' + d.declaration.case1AK,
+      '- Case 1BK (Frais de repas) : ' + d.declaration.case1BK,
+      '- Case 1CK (Autres frais) : ' + d.declaration.case1CK,
+      d.mutuelle.deductible > 0
+        ? '- Case ' + d.mutuelle.case + ' (' + d.mutuelle.info + ') : ' + fmt(d.mutuelle.deductible) + ' -> Formulaire ' + d.mutuelle.formulaire
+        : '- Mutuelle : ' + d.mutuelle.info,
+      '======================================='
+    ];
+    exporter('declaration_frais_reels_' + currentYear + '_' + dateFr() + '.txt', lignes.join('\n'), 'text/plain');
+  }
+
+  function exportJSON() {
+    var data = construireDonnees();
+    data.results.verdict = $('verdict-box').querySelector('.verdict-text').textContent;
+    exporter('frais_reels_' + currentYear + '_' + dateFr() + '.json',
+             JSON.stringify(data, null, 2), 'application/json');
+  }
+
+  function exportCSV() {
+    var d = construireDonnees();
+    var lignes = [
+      ['Categorie', 'Libelle', 'Valeur', 'Unite', 'Case declaration'],
+      ['Situation', 'Salaire brut annuel', d.situation.salaireBrut, 'EUR', ''],
+      ['Situation', 'Nombre de parts', d.situation.nombreParts, '', ''],
+      ['Situation', 'Jours au bureau', d.situation.joursBureau, 'jours', ''],
+      ['Transport', 'Frais ' + d.transport.typeLabel, d.transport.fraisTransport, 'EUR', '1AK'],
+      ['Transport', 'Kilometrage annuel', d.transport.kmAnnuel, 'km', ''],
+      ['Repas', 'Frais repas deductibles', d.repas.deductible, 'EUR', '1BK'],
+      ['Autres frais', 'Total autres frais', d.autresFrais.total, 'EUR', '1CK'],
+      ['Remboursements', 'Total remboursements', d.remboursements.total, 'EUR', ''],
+      ['Resultats', 'Total frais reels nets', d.results.totalFraisNets, 'EUR', ''],
+      ['Resultats', 'Abattement forfaitaire 10%', d.results.abattement10Pct, 'EUR', ''],
+      ['Resultats', 'Gain/Perte vs abattement', d.results.gain, 'EUR', ''],
+      ['Resultats', 'Revenu net imposable', d.results.revenuNetImposable, 'EUR', ''],
+      ['Resultats', 'Impot brut', d.results.impotBrut, 'EUR', ''],
+      ['Resultats', 'Tranche fiscale', d.results.tranche, '', ''],
+      ['Mutuelle', d.mutuelle.info, d.mutuelle.deductible, 'EUR', d.mutuelle.case || '']
+    ];
+    var csv = lignes.map(function (row) {
+      return row.map(function (cell) {
+        var str = String(cell === null || cell === undefined ? '' : cell).replace(/"/g, '""');
+        return str.indexOf(';') !== -1 || str.indexOf('\n') !== -1 || str.indexOf('"') !== -1 ? '"' + str + '"' : str;
+      }).join(';');
+    }).join('\n');
+    exporter('frais_reels_' + currentYear + '_' + dateFr() + '.csv', csv, 'text/csv;charset=utf-8;');
+  }
+
+  function init() {
+    initYearSelector();
+
+    ['transport-type', 'repas-type', 'mutuelle-type'].forEach(function (groupeId) {
+      $(groupeId).addEventListener('click', function (e) {
+        var btn = e.target.closest('.btn');
+        if (!btn) return;
+        var type = btn.getAttribute('data-type');
+        if (groupeId === 'transport-type') setTransport(type);
+        else if (groupeId === 'repas-type') setRepasType(type);
+        else setMutuelle(type);
+      });
+    });
+
+    var champs = document.querySelectorAll('input, select');
+    for (var i = 0; i < champs.length; i++) {
+      champs[i].addEventListener('input', calc);
+      champs[i].addEventListener('change', calc);
+    }
+
+    $('export-txt').addEventListener('click', exportTXT);
+    $('export-json').addEventListener('click', exportJSON);
+    $('export-csv').addEventListener('click', exportCSV);
+
+    calc();
+  }
+
+  document.addEventListener('DOMContentLoaded', init);
+})();
+</script>
+</body>
+</html>
