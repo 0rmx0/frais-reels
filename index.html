@@ -4,7 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Calculateur Frais Réels — Impôts France</title>
-<link href="https://fonts.bunny.net/css?family=manrope:300,400,500,600|spectral:400,500,600" rel="stylesheet">
+<meta name="description" content="Simulateur 100 % client-side pour comparer frais réels et abattement forfaitaire de 10 % sur ta déclaration de revenus en France (barèmes officiels impots.gouv.fr / BOFiP).">
+<meta property="og:title" content="Calculateur Frais Réels — Impôts France">
+<meta property="og:description" content="Frais réels vs abattement 10 % : transport (barème kilométrique officiel), repas, tickets restaurant, télétravail, mutuelle. Aucune donnée envoyée.">
+<meta property="og:type" content="website">
+<meta name="theme-color" content="#0f2040">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'; manifest-src 'self'">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.bunny.net" crossorigin>
+<link href="https://fonts.bunny.net/css?family=manrope:300,400,500,600|spectral:400,500,600&display=swap" rel="stylesheet">
 <style>
   :root {
     --navy: #0f2040;
@@ -15,7 +25,7 @@
     --card: #fffdf8;
     --border: #ddd8cc;
     --text: #1a1a2e;
-    --muted: #7a7060;
+    --muted: #6f6455;
     --success: #1a8a5a;
     --warning: #c04a10;
     --input-bg: #fff;
@@ -29,17 +39,18 @@
   .header-badge { display: inline-block; background: rgba(232, 160, 32, 0.18); color: var(--accent); border: 1px solid rgba(232, 160, 32, 0.35); border-radius: 20px; font-size: 11px; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; padding: 5px 14px; margin-bottom: 16px; }
   h1 { font-family: 'Spectral', serif; font-size: clamp(28px, 5vw, 42px); color: #fff; line-height: 1.15; margin-bottom: 10px; }
   h1 em { color: var(--accent); font-style: italic; }
-  .header-sub { color: rgba(255, 255, 255, 0.6); font-size: 14px; font-weight: 300; max-width: 600px; }
-  .year-selector-wrap { margin-top: 16px; }
+  .header-sub { color: rgba(255, 255, 255, 0.75); font-size: 14px; font-weight: 300; max-width: 640px; }
+  .year-selector-wrap { margin-top: 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
   .year-selector-wrap select { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: #fff; padding: 8px 14px; border-radius: 8px; font-size: 14px; width: auto; }
   .year-selector-wrap select option { color: var(--navy); }
-  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 60px; display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start; }
+  .year-note { color: var(--accent); font-size: 12px; font-weight: 500; }
+  .page-wrap { max-width: 1280px; margin: 0 auto; padding: 32px 24px 60px; display: grid; grid-template-columns: 1fr 380px; gap: 24px; align-items: start; }
   .main { display: grid; gap: 20px; min-width: 0; }
   .sidebar { position: sticky; top: 24px; }
   @media (max-width: 900px) { .page-wrap { grid-template-columns: 1fr; } .sidebar { position: static; } }
   .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; transition: box-shadow 0.2s; }
   .card:hover { box-shadow: 0 4px 24px rgba(15, 32, 64, 0.08); }
-  .card-header { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; }
+  .card-header { display: flex; align-items: center; gap: 14px; padding: 18px 22px; border-bottom: 1px solid var(--border); cursor: pointer; user-select: none; width: 100%; border-top: none; border-left: none; border-right: none; background: transparent; font: inherit; color: inherit; text-align: left; }
   .card-header:hover { background: rgba(15, 32, 64, 0.02); }
   .card-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--navy); display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
   .card-title { font-family: 'Spectral', serif; font-size: 17px; color: var(--navy); flex: 1; }
@@ -58,47 +69,59 @@
   input[type="number"], input[type="text"], select { background: var(--input-bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 10px 14px; font-family: 'Manrope', sans-serif; font-size: 14px; color: var(--text); outline: none; transition: border-color 0.2s, box-shadow 0.2s; width: 100%; -moz-appearance: textfield; }
   input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; }
   input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(26, 74, 138, 0.12); }
-  input.filled { border-color: var(--accent2); background: rgba(45, 199, 160, 0.04); }
   input[readonly] { background: rgba(0, 0, 0, 0.03); color: var(--muted); cursor: not-allowed; }
+  input:disabled { opacity: 0.55; cursor: not-allowed; }
   select { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%237a7060' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; font-family: 'Manrope', sans-serif; }
+  .checkbox-field { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--text); cursor: pointer; }
+  .checkbox-field input { width: 16px; height: 16px; margin-top: 1px; accent-color: var(--blue); flex-shrink: 0; }
   .divider { display: flex; align-items: center; gap: 12px; margin: 18px 0 14px; color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; font-family: 'Manrope', sans-serif; }
   .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
   .result-card { background: var(--navy); border-radius: 16px; overflow: hidden; }
   .result-header { padding: 20px 24px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
   .result-title { font-family: 'Spectral', serif; color: #fff; font-size: 20px; margin-bottom: 4px; }
-  .result-sub { color: rgba(255, 255, 255, 0.5); font-size: 12px; font-family: 'Manrope', sans-serif; }
+  .result-sub { color: rgba(255, 255, 255, 0.7); font-size: 12px; font-family: 'Manrope', sans-serif; }
   .result-body { padding: 20px 24px; }
   .result-grid { display: grid; gap: 16px; }
   .result-item { display: flex; flex-direction: column; gap: 4px; }
-  .result-item-label { font-size: 12px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Manrope', sans-serif; }
+  .result-item-label { font-size: 12px; color: rgba(255, 255, 255, 0.75); text-transform: uppercase; letter-spacing: 0.5px; font-family: 'Manrope', sans-serif; }
   .result-item-value { font-size: 24px; font-weight: 600; color: #fff; font-family: 'Manrope', sans-serif; }
   .result-item-value.accent { color: var(--accent); }
-  .result-item-sub { font-size: 11px; color: rgba(255, 255, 255, 0.4); font-family: 'Manrope', sans-serif; }
+  .result-item-sub { font-size: 11px; color: rgba(255, 255, 255, 0.65); font-family: 'Manrope', sans-serif; }
   .detail-table { background: rgba(255, 255, 255, 0.05); border-radius: 12px; padding: 16px; margin-top: 20px; font-size: 13px; font-family: 'Manrope', sans-serif; }
-  .detail-row { display: flex; justify-content: space-between; padding: 8px 0; color: rgba(255, 255, 255, 0.8); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+  .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; color: rgba(255, 255, 255, 0.85); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
   .detail-row:last-child { border-bottom: none; }
-  .detail-label { color: rgba(255, 255, 255, 0.6); }
-  .detail-value { font-weight: 600; }
-  .detail-value.neg { color: var(--warning); }
+  .detail-label { color: rgba(255, 255, 255, 0.75); }
+  .detail-value { font-weight: 600; text-align: right; }
+  .detail-value.neg { color: #ff9a62; }
+  .warnings { margin-top: 16px; display: none; }
+  .warnings.visible { display: block; }
+  .warnings-title { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: rgba(255,255,255,0.75); margin-bottom: 8px; }
+  .warning-item { display: flex; gap: 10px; padding: 10px 12px; border-radius: 8px; font-size: 12.5px; line-height: 1.45; margin-bottom: 8px; background: rgba(192, 74, 16, 0.18); border: 1px solid rgba(255, 138, 77, 0.45); color: #ffb287; }
+  .warning-item.info { background: rgba(26, 74, 138, 0.25); border-color: rgba(140, 180, 240, 0.4); color: #aecbfa; }
+  .warning-icon { flex-shrink: 0; }
   .verdict { display: flex; align-items: flex-start; gap: 12px; padding: 16px; border-radius: 12px; margin-top: 16px; font-size: 14px; line-height: 1.5; font-family: 'Manrope', sans-serif; }
-  .verdict.neutral { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.8); }
+  .verdict.neutral { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.85); }
   .verdict.good { background: rgba(45, 199, 160, 0.15); color: var(--accent2); }
-  .verdict.bad { background: rgba(192, 74, 16, 0.15); color: var(--warning); }
+  .verdict.bad { background: rgba(192, 74, 16, 0.2); color: #ff9a62; }
   .verdict-icon { font-size: 20px; }
   .verdict-text strong { font-weight: 600; }
-  .toggle-group { display: flex; gap: 8px; background: var(--input-bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 4px; }
-  .toggle-btn { flex: 1; padding: 8px 12px; border: none; background: transparent; border-radius: 6px; font-family: 'Manrope', sans-serif; font-size: 13px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all 0.2s; }
+  .toggle-group { display: flex; gap: 8px; background: var(--input-bg); border: 1.5px solid var(--border); border-radius: 8px; padding: 4px; flex-wrap: wrap; }
+  .toggle-btn { flex: 1; padding: 8px 10px; border: none; background: transparent; border-radius: 6px; font-family: 'Manrope', sans-serif; font-size: 12.5px; font-weight: 500; color: var(--muted); cursor: pointer; transition: all 0.2s; white-space: nowrap; }
   .toggle-btn.active { background: var(--navy); color: #fff; box-shadow: 0 2px 4px rgba(15, 32, 64, 0.1); }
   .toggle-btn:hover:not(.active) { background: rgba(15, 32, 64, 0.04); }
-  .info-box { background: rgba(26, 74, 138, 0.06); border: 1px solid rgba(26, 74, 138, 0.2); border-radius: 8px; padding: 12px 14px; margin-top: 16px; font-size: 13px; color: var(--blue); font-family: 'Manrope', sans-serif; }
+  .info-box { background: rgba(26, 74, 138, 0.06); border: 1px solid rgba(26, 74, 138, 0.2); border-radius: 8px; padding: 12px 14px; margin-top: 16px; font-size: 13px; color: var(--blue); font-family: 'Manrope', sans-serif; line-height: 1.5; }
   .info-box::before { content: 'ℹ️'; margin-right: 8px; }
   .info-box ul { margin-top: 8px; padding-left: 20px; }
   .info-box li { margin-bottom: 4px; }
   .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 10px 20px; background: var(--navy); color: #fff; border: none; border-radius: 8px; font-family: 'Manrope', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; transition: background 0.2s; }
   .btn:hover { background: var(--blue); }
   .btn:active { transform: scale(0.98); }
-  .export-section { margin-top: 20px; padding: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; text-align: center; }
-  .export-dropdown { position: relative; display: inline-block; }
+  .btn-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18); }
+  .btn-secondary:hover { background: rgba(255, 255, 255, 0.16); }
+  .actions-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .actions-bar .btn { flex: 1 1 45%; padding: 9px 10px; font-size: 12.5px; }
+  .export-section { margin-top: 16px; padding: 16px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; text-align: center; }
+  .export-dropdown { position: relative; display: inline-block; width: 100%; }
   .export-dropdown-btn { background: var(--accent); color: var(--navy); width: 100%; }
   .export-dropdown-btn:hover { background: #d49518; }
   .export-menu { display: none; position: absolute; bottom: 100%; left: 0; right: 0; background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 8px 0; z-index: 100; margin-bottom: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.1); }
@@ -106,14 +129,51 @@
   .export-menu .export-btn:hover { background: rgba(26, 74, 138, 0.06); }
   .export-menu .export-btn svg { width: 16px; height: 16px; margin-right: 8px; vertical-align: -2px; }
   footer { background: var(--navy); border-top: 1px solid rgba(255, 255, 255, 0.08); padding: 16px 28px; margin-top: 8px; }
-  .footer-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 12px; font-size: 13px; font-family: 'Manrope', sans-serif; }
-  .footer-version { color: rgba(255, 255, 255, 0.4); }
+  .footer-inner { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; gap: 12px; font-size: 13px; font-family: 'Manrope', sans-serif; flex-wrap: wrap; }
+  .footer-version { color: rgba(255, 255, 255, 0.55); }
   .footer-sep { color: rgba(255, 255, 255, 0.2); }
-  .footer-link { color: rgba(255, 255, 255, 0.6); text-decoration: none; transition: color 0.2s; }
+  .footer-link { color: rgba(255, 255, 255, 0.7); text-decoration: none; transition: color 0.2s; }
   .footer-link:hover { color: var(--accent); }
   .mt8 { margin-top: 8px; }
   .mt16 { margin-top: 16px; }
   .hidden { display: none !important; }
+  :focus-visible { outline: 2px solid var(--accent2); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --bg: #0d1321;
+      --card: #151e30;
+      --border: #2a3752;
+      --text: #e9e7e0;
+      --muted: #a3abc0;
+      --input-bg: #0d1321;
+    }
+    .card:hover { box-shadow: 0 4px 24px rgba(0, 0, 0, 0.45); }
+    .card-header:hover { background: rgba(255, 255, 255, 0.04); }
+    .card-title { color: #dce6f5; }
+    .toggle-btn:hover:not(.active) { background: rgba(255, 255, 255, 0.06); }
+    .toggle-btn.active { background: var(--accent); color: var(--navy); }
+    .info-box { background: rgba(90, 140, 220, 0.12); border-color: rgba(90, 140, 220, 0.35); color: #9cc0f5; }
+    input[readonly] { background: rgba(255, 255, 255, 0.06); }
+    .export-menu { background: var(--card); }
+    .btn { background: var(--accent); color: var(--navy); }
+    .btn:hover { background: #d49518; }
+    .export-dropdown-btn { background: var(--accent); color: var(--navy); }
+    .export-dropdown-btn:hover { background: #d49518; }
+  }
+  @media print {
+    :root { color-scheme: light; --bg: #fff; --card: #fff; --border: #ccc; --text: #000; --muted: #444; --input-bg: #fff; }
+    header, .main, .actions-bar, .export-section, footer, #warnings { display: none !important; }
+    body { background: #fff; }
+    .page-wrap { display: block; padding: 0; }
+    .sidebar { position: static; }
+    .result-card { background: #fff; border: 1px solid #999; border-radius: 0; }
+    .result-card, .result-card * { color: #000 !important; }
+    .result-header, .detail-row { border-color: #ccc; }
+    .detail-table, .verdict { background: #f6f6f6; }
+    .verdict.good, .verdict.bad, .verdict.neutral { border: 1px solid #999; }
+  }
 </style>
 </head>
 <body>
@@ -122,9 +182,11 @@
   <div class="header-inner">
     <div class="header-badge">Déclaration France</div>
     <h1>Calculateur<br><em>Frais Réels</em></h1>
-    <p class="header-sub">Avec gestion des tickets restaurant selon les règles officielles <span data-year-display>2027 (revenus 2026)</span>.</p>
+    <p class="header-sub">Frais réels vs abattement de 10 % selon les barèmes officiels <span data-year-display>2026 (revenus 2025)</span> — 100 % local, aucune donnée envoyée.</p>
     <div class="year-selector-wrap">
+      <label for="year-selector" style="position:absolute;left:-9999px">Année de déclaration</label>
       <select id="year-selector"></select>
+      <span class="year-note hidden" id="year-note">⚠ barème provisoire — publié au printemps 2027</span>
     </div>
   </div>
 </header>
@@ -134,87 +196,95 @@
 
     <!-- SECTION 1 : SITUATION FISCALE -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('fiscal')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-fiscal" onclick="toggleCard('fiscal')">
         <div class="card-icon">📊</div>
         <div class="card-title">Situation fiscale</div>
-        <div class="card-toggle" id="toggle-fiscal">▾</div>
-      </div>
+        <div class="card-toggle open" id="toggle-fiscal">▾</div>
+      </button>
       <div class="card-body open" id="body-fiscal">
         <div class="form-grid">
           <div class="field">
-            <label>Salaire brut annuel (€)<span class="label-hint">avant impôts</span></label>
-            <input type="number" id="salaire" placeholder="ex: 42000" oninput="calc()">
+            <label for="salaire">Salaire brut annuel (€)<span class="label-hint">avant impôts, case 1AJ</span></label>
+            <input type="number" id="salaire" placeholder="ex: 42000" inputmode="decimal">
           </div>
           <div class="field">
-            <label>Nombre de parts fiscales</label>
-            <input type="number" id="nombre_parts" placeholder="ex: 2" step="0.5" oninput="calc()">
+            <label for="nombre_parts">Nombre de parts fiscales</label>
+            <input type="number" id="nombre_parts" placeholder="ex: 2" step="0.5" inputmode="decimal">
+          </div>
+          <div class="field span2">
+            <label for="situation">Situation familiale<span class="label-hint">pour la décote et le quotient familial</span></label>
+            <select id="situation">
+              <option value="celibataire">Célibataire / divorcé·e / veuf·ve (1 part de base)</option>
+              <option value="couple">Marié·e / pacsé·e — imposition commune (2 parts de base)</option>
+            </select>
           </div>
         </div>
         <div class="info-box">
-          Exemples : 1 (célibataire), 2 (couple), 2.5 (1 enfant), 3 (2 enfants), etc.
+          Exemples de parts : 1 (célibataire), 2 (couple), 2,5 (1 enfant), 3 (2 enfants). Parent isolé : laissez « célibataire » (forfait de décote identique).
         </div>
       </div>
     </div>
 
     <!-- SECTION 2 : EMPLOI -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('emploi')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-emploi" onclick="toggleCard('emploi')">
         <div class="card-icon">💼</div>
-        <div class="card-title">Emploi & présence</div>
-        <div class="card-toggle" id="toggle-emploi">▾</div>
-      </div>
+        <div class="card-title">Emploi &amp; présence</div>
+        <div class="card-toggle open" id="toggle-emploi">▾</div>
+      </button>
       <div class="card-body open" id="body-emploi">
         <div class="form-grid">
           <div class="field">
-            <label>Jours ouvrés dans l'année</label>
-            <input type="number" id="jours_ouvres" placeholder="ex: 228" oninput="calc()">
+            <label for="jours_ouvres">Jours ouvrés dans l'année</label>
+            <input type="number" id="jours_ouvres" placeholder="ex: 228" inputmode="numeric">
           </div>
           <div class="field">
-            <label>Jours en arrêt maladie</label>
-            <input type="number" id="jours_arret" placeholder="ex: 0" oninput="calc()">
+            <label for="jours_arret">Jours en arrêt maladie</label>
+            <input type="number" id="jours_arret" placeholder="ex: 0" inputmode="numeric">
           </div>
           <div class="field">
-            <label>Jours en télétravail</label>
-            <input type="number" id="jours_teletravail" placeholder="ex: 45" oninput="calc()">
+            <label for="jours_teletravail">Jours en télétravail</label>
+            <input type="number" id="jours_teletravail" placeholder="ex: 45" inputmode="numeric">
           </div>
         </div>
         <div class="info-box">
-          Jours au bureau = Jours ouvrés − Arrêts maladie − Télétravail.
+          Jours au bureau = Jours ouvrés − Arrêts maladie − Télétravail. Un seul aller-retour par jour est admis.
         </div>
       </div>
     </div>
 
     <!-- SECTION 3 : TRANSPORT -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('transport')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-transport" onclick="toggleCard('transport')">
         <div class="card-icon">🚗</div>
         <div class="card-title">Transport domicile ↔ travail</div>
-        <div class="card-toggle" id="toggle-transport">▾</div>
-      </div>
+        <div class="card-toggle open" id="toggle-transport">▾</div>
+      </button>
       <div class="card-body open" id="body-transport">
         <div class="form-grid single">
           <div class="field">
-            <label>Moyen de transport principal</label>
-            <div class="toggle-group mt8" id="transport-type">
-              <button class="toggle-btn active" data-type="voiture" onclick="setTransport('voiture', this)">🚗 Voiture</button>
-              <button class="toggle-btn" data-type="moto" onclick="setTransport('moto', this)">🛵 Moto</button>
-              <button class="toggle-btn" data-type="tc" onclick="setTransport('tc', this)">🚇 Transports commun</button>
-              <button class="toggle-btn" data-type="velo" onclick="setTransport('velo', this)">🚲 Vélo / marche</button>
+            <label id="label-transport">Moyen de transport principal</label>
+            <div class="toggle-group mt8" id="transport-type" role="group" aria-labelledby="label-transport">
+              <button type="button" class="toggle-btn active" data-type="voiture" onclick="setTransport('voiture', this)">🚗 Voiture</button>
+              <button type="button" class="toggle-btn" data-type="moto" onclick="setTransport('moto', this)">🛵 Moto</button>
+              <button type="button" class="toggle-btn" data-type="cyclomoteur" onclick="setTransport('cyclomoteur', this)">🛴 Cyclo</button>
+              <button type="button" class="toggle-btn" data-type="tc" onclick="setTransport('tc', this)">🚇 Transports</button>
+              <button type="button" class="toggle-btn" data-type="velo" onclick="setTransport('velo', this)">🚲 Vélo</button>
             </div>
           </div>
         </div>
 
-        <!-- VOITURE / MOTO -->
+        <!-- VOITURE / MOTO / CYCLOMOTEUR -->
         <div id="block-vehicule">
           <div class="divider">Véhicule</div>
           <div class="form-grid">
             <div class="field">
-              <label>Distance aller domicile → travail (km)</label>
-              <input type="number" id="dist_aller" placeholder="ex: 22" oninput="calc()">
+              <label for="dist_aller">Distance aller domicile → travail (km)</label>
+              <input type="number" id="dist_aller" placeholder="ex: 22" inputmode="decimal">
             </div>
-            <div class="field">
-              <label>Puissance fiscale (CV)</label>
-              <select id="cv" onchange="calc()">
+            <div class="field" id="field-cv">
+              <label for="cv">Puissance fiscale (CV)</label>
+              <select id="cv">
                 <option value="">— CV fiscaux —</option>
                 <option value="3">3 CV et moins</option>
                 <option value="4">4 CV</option>
@@ -224,16 +294,36 @@
               </select>
             </div>
             <div class="field">
-              <label>Énergie du véhicule</label>
-              <select id="energie" onchange="calc()">
+              <label for="energie">Énergie du véhicule</label>
+              <select id="energie">
                 <option value="">— Énergie —</option>
                 <option value="thermique">Essence / Diesel / Hybride</option>
-                <option value="electrique">Électrique / Hydrogène (+20%)</option>
+                <option value="electrique">100 % électrique (+20 %)</option>
               </select>
             </div>
             <div class="field">
-              <label>Kilométrage annuel total du véhicule (calculé automatiquement)</label>
+              <label for="km_annuel">Kilométrage annuel retenu (calculé automatiquement)</label>
               <input type="number" id="km_annuel" placeholder="Calculé automatiquement" readonly>
+            </div>
+          </div>
+          <div class="divider">Distance retenue</div>
+          <label class="checkbox-field">
+            <input type="checkbox" id="circonstances">
+            <span>Circonstances particulières justifiant plus de 40 km aller (emploi du conjoint, santé, logement…). Au-delà de 40 km aller, seuls 40 km par trajet (80 km/jour) sont retenus, sauf à joindre une note explicative.</span>
+          </label>
+          <div class="divider">Frais annexes (s'ajoutent au barème)</div>
+          <div class="form-grid">
+            <div class="field">
+              <label for="peage">Péages (€ / an, non remboursés)</label>
+              <input type="number" id="peage" placeholder="ex: 120" inputmode="decimal">
+            </div>
+            <div class="field">
+              <label for="parking">Stationnement (€ / an, non remboursé)</label>
+              <input type="number" id="parking" placeholder="ex: 300" inputmode="decimal">
+            </div>
+            <div class="field">
+              <label for="interets">Intérêts d'emprunt (€ / an, prorata usage pro)</label>
+              <input type="number" id="interets" placeholder="ex: 0" inputmode="decimal">
             </div>
           </div>
         </div>
@@ -243,8 +333,8 @@
           <div class="divider">Transports en commun</div>
           <div class="form-grid">
             <div class="field">
-              <label>Coût annuel abonnement (€)</label>
-              <input type="number" id="cout_abonnement" placeholder="ex: 800" oninput="calc()">
+              <label for="cout_abonnement">Coût annuel abonnement (€), part non remboursée</label>
+              <input type="number" id="cout_abonnement" placeholder="ex: 400" inputmode="decimal">
             </div>
           </div>
         </div>
@@ -254,8 +344,8 @@
           <div class="divider">Vélo / Marche</div>
           <div class="form-grid">
             <div class="field">
-              <label>Frais divers (entretien, équipement, etc.) (€)</label>
-              <input type="number" id="frais_velo" placeholder="ex: 200" oninput="calc()">
+              <label for="frais_velo">Frais divers (entretien, équipement, etc.) (€)</label>
+              <input type="number" id="frais_velo" placeholder="ex: 200" inputmode="decimal">
             </div>
           </div>
         </div>
@@ -264,19 +354,19 @@
 
     <!-- SECTION 4 : REPAS -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('repas')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-repas" onclick="toggleCard('repas')">
         <div class="card-icon">🍽️</div>
         <div class="card-title">Frais de repas</div>
-        <div class="card-toggle" id="toggle-repas">▾</div>
-      </div>
+        <div class="card-toggle open" id="toggle-repas">▾</div>
+      </button>
       <div class="card-body open" id="body-repas">
         <div class="form-grid single">
           <div class="field">
-            <label>Type de frais de repas</label>
-            <div class="toggle-group mt8" id="repas-type">
-              <button class="toggle-btn active" data-type="classique" onclick="setRepasType('classique', this)">🍽️ Repas classiques</button>
-              <button class="toggle-btn" data-type="tickets" onclick="setRepasType('tickets', this)">🎫 Tickets restaurant</button>
-              <button class="toggle-btn" data-type="mixte" onclick="setRepasType('mixte', this)">🍽️+🎫 Mixte</button>
+            <label id="label-repas">Type de frais de repas</label>
+            <div class="toggle-group mt8" id="repas-type" role="group" aria-labelledby="label-repas">
+              <button type="button" class="toggle-btn active" data-type="classique" onclick="setRepasType('classique', this)">🍽️ Repas classiques</button>
+              <button type="button" class="toggle-btn" data-type="tickets" onclick="setRepasType('tickets', this)">🎫 Tickets restaurant</button>
+              <button type="button" class="toggle-btn" data-type="mixte" onclick="setRepasType('mixte', this)">🍽️+🎫 Mixte</button>
             </div>
           </div>
         </div>
@@ -286,12 +376,12 @@
           <div class="divider">Repas classiques</div>
           <div class="form-grid">
             <div class="field">
-              <label>Nombre de repas professionnels par an</label>
-              <input type="number" id="nb_repas_classique" placeholder="ex: 200" oninput="calc()">
+              <label for="nb_repas_classique">Nombre de repas professionnels par an</label>
+              <input type="number" id="nb_repas_classique" placeholder="ex: 200" inputmode="numeric">
             </div>
             <div class="field">
-              <label>Coût moyen par repas (€)</label>
-              <input type="number" id="cout_repas_classique" placeholder="ex: 10.00" step="0.01" oninput="calc()">
+              <label for="cout_repas_classique">Coût moyen par repas (€)</label>
+              <input type="number" id="cout_repas_classique" placeholder="ex: 12.00" step="0.01" inputmode="decimal">
             </div>
           </div>
         </div>
@@ -301,16 +391,16 @@
           <div class="divider">Tickets restaurant</div>
           <div class="form-grid">
             <div class="field">
-              <label>Nombre de tickets par an</label>
-              <input type="number" id="nb_tickets" placeholder="ex: 200" oninput="calc()">
+              <label for="nb_tickets">Nombre de tickets par an</label>
+              <input type="number" id="nb_tickets" placeholder="ex: 200" inputmode="numeric">
             </div>
             <div class="field">
-              <label>Valeur faciale du ticket (€)</label>
-              <input type="number" id="valeur_ticket" placeholder="ex: 8.38" step="0.01" oninput="calc()">
+              <label for="valeur_ticket">Valeur faciale du ticket (€)</label>
+              <input type="number" id="valeur_ticket" placeholder="ex: 12.00" step="0.01" inputmode="decimal">
             </div>
             <div class="field">
-              <label>Part employeur par ticket (€)</label>
-              <input type="number" id="part_employeur_ticket" placeholder="ex: 5.92" step="0.01" oninput="calc()">
+              <label for="part_employeur_ticket">Part employeur par ticket (€)</label>
+              <input type="number" id="part_employeur_ticket" placeholder="ex: 7.20" step="0.01" inputmode="decimal">
             </div>
           </div>
         </div>
@@ -320,43 +410,36 @@
           <div class="divider">Repas classiques</div>
           <div class="form-grid">
             <div class="field">
-              <label>Nombre de repas professionnels par an</label>
-              <input type="number" id="nb_repas_mixte" placeholder="ex: 100" oninput="calc()">
+              <label for="nb_repas_mixte">Nombre de repas professionnels par an</label>
+              <input type="number" id="nb_repas_mixte" placeholder="ex: 100" inputmode="numeric">
             </div>
             <div class="field">
-              <label>Coût moyen par repas (€)</label>
-              <input type="number" id="cout_repas_mixte" placeholder="ex: 10.00" step="0.01" oninput="calc()">
+              <label for="cout_repas_mixte">Coût moyen par repas (€)</label>
+              <input type="number" id="cout_repas_mixte" placeholder="ex: 12.00" step="0.01" inputmode="decimal">
             </div>
           </div>
           <div class="divider">Tickets restaurant</div>
           <div class="form-grid">
             <div class="field">
-              <label>Nombre de tickets par an</label>
-              <input type="number" id="nb_tickets_mixte" placeholder="ex: 100" oninput="calc()">
+              <label for="nb_tickets_mixte">Nombre de tickets par an</label>
+              <input type="number" id="nb_tickets_mixte" placeholder="ex: 100" inputmode="numeric">
             </div>
             <div class="field">
-              <label>Valeur faciale du ticket (€)</label>
-              <input type="number" id="valeur_ticket_mixte" placeholder="ex: 8.38" step="0.01" oninput="calc()">
+              <label for="valeur_ticket_mixte">Valeur faciale du ticket (€)</label>
+              <input type="number" id="valeur_ticket_mixte" placeholder="ex: 12.00" step="0.01" inputmode="decimal">
             </div>
             <div class="field">
-              <label>Part employeur par ticket (€)</label>
-              <input type="number" id="part_employeur_ticket_mixte" placeholder="ex: 5.92" step="0.01" oninput="calc()">
+              <label for="part_employeur_ticket_mixte">Part employeur par ticket (€)</label>
+              <input type="number" id="part_employeur_ticket_mixte" placeholder="ex: 7.20" step="0.01" inputmode="decimal">
             </div>
           </div>
         </div>
 
         <div class="info-box">
-          <strong>Règles officielles <span data-year-display>2027</span> (sources : ESCEC International & impots.gouv.fr)</strong> :
+          <strong>Règles officielles <span data-year-display>2026</span> (impots.gouv.fr / BOFiP)</strong> :
           <ul>
-            <li><strong>Forfait repas</strong> : 5,45 € (seule la partie > 5,45 € est déductible).</li>
-            <li><strong>Tickets restaurant</strong> :
-              <ul>
-                <li>Plafond non imposable : <strong>8,38 €/ticket</strong>.</li>
-                <li>Part employeur max non imposable : <strong>5,92 €/ticket</strong>.</li>
-                <li>Reste à charge = Valeur ticket − Part employeur.</li>
-                <li>Déductible si <strong>reste à charge > 5,45 €</strong>.</li>
-              </ul>
-            </li>
+            <li><strong>Forfait repas au foyer</strong> : <span data-forfait-repas>5,45</span> € — seule la partie au-delà est déductible, dans la limite d'une dépense retenue de <strong><span data-plafond-repas>21,10</span> €/repas</strong> (déduction max <strong><span data-plafond-repas-max>15,65</span> €/repas</strong>). Sans justificatif, le fisc admet un forfait de <span data-forfait-repas>5,45</span> € par repas.</li>
+            <li><strong>Tickets restaurant</strong> : la part employeur est exonérée si elle est entre <strong>50 % et 60 %</strong> de la valeur du titre et ≤ <strong><span data-plafond-employeur>7,32</span> €/titre</strong>. Déductible : valeur du ticket − part employeur − <span data-forfait-repas>5,45</span> € (ex. 12 − 4,50 − 5,45 = 2,05 €).</li>
           </ul>
         </div>
       </div>
@@ -364,28 +447,38 @@
 
     <!-- SECTION 5 : AUTRES FRAIS -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('autres')">
+      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-autres" onclick="toggleCard('autres')">
         <div class="card-icon">💳</div>
         <div class="card-title">Autres frais professionnels</div>
         <div class="card-toggle" id="toggle-autres">▾</div>
-      </div>
+      </button>
       <div class="card-body" id="body-autres">
         <div class="form-grid">
           <div class="field">
-            <label>Frais de télétravail (€/an)</label>
-            <input type="number" id="frais_teletravail" placeholder="ex: 300" oninput="calc()">
+            <label for="frais_teletravail">Frais de télétravail (€ / an)</label>
+            <input type="number" id="frais_teletravail" placeholder="ex: 300" inputmode="decimal">
+          </div>
+          <div class="field span2">
+            <label class="checkbox-field">
+              <input type="checkbox" id="forfait_tt">
+              <span>Appliquer le <strong>forfait télétravail</strong> de <span data-forfait-tt>2,70</span> € / jour (plafonné à <span data-plafond-tt>626,40</span> €/an) — calculé depuis mes jours de télétravail</span>
+            </label>
+            <label class="checkbox-field mt8">
+              <input type="checkbox" id="alloc_tt">
+              <span>Mon employeur me verse une <strong>allocation télétravail exonérée</strong> → frais de télétravail non déductibles</span>
+            </label>
           </div>
           <div class="field">
-            <label>Frais de formation (€/an)</label>
-            <input type="number" id="frais_formation" placeholder="ex: 200" oninput="calc()">
+            <label for="frais_formation">Frais de formation (€ / an)</label>
+            <input type="number" id="frais_formation" placeholder="ex: 200" inputmode="decimal">
           </div>
           <div class="field">
-            <label>Frais de documentation (€/an)</label>
-            <input type="number" id="frais_doc" placeholder="ex: 100" oninput="calc()">
+            <label for="frais_doc">Frais de documentation (€ / an)</label>
+            <input type="number" id="frais_doc" placeholder="ex: 100" inputmode="decimal">
           </div>
           <div class="field">
-            <label>Autres frais (préciser)</label>
-            <input type="number" id="frais_autres" placeholder="ex: 0" oninput="calc()">
+            <label for="frais_autres">Autres frais (préciser)</label>
+            <input type="number" id="frais_autres" placeholder="ex: 0" inputmode="decimal">
           </div>
         </div>
       </div>
@@ -393,52 +486,52 @@
 
     <!-- SECTION 6 : REMBOURSEMENTS -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('remb')">
+      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-remb" onclick="toggleCard('remb')">
         <div class="card-icon">💰</div>
         <div class="card-title">Remboursements employeur</div>
         <div class="card-toggle" id="toggle-remb">▾</div>
-      </div>
+      </button>
       <div class="card-body" id="body-remb">
         <div class="form-grid">
           <div class="field">
-            <label>Indemnités kilométriques reçues (€/an)</label>
-            <input type="number" id="remb_ik" placeholder="ex: 0" oninput="calc()">
+            <label for="remb_ik">Indemnités kilométriques reçues (€ / an)</label>
+            <input type="number" id="remb_ik" placeholder="ex: 0" inputmode="decimal">
           </div>
           <div class="field">
-            <label>Prime carburant / mobilité (€/an)</label>
-            <input type="number" id="remb_carburant" placeholder="ex: 0" oninput="calc()">
+            <label for="remb_carburant">Prime carburant / mobilité (€ / an)</label>
+            <input type="number" id="remb_carburant" placeholder="ex: 0" inputmode="decimal">
           </div>
           <div class="field">
-            <label>Forfait mobilités durables (€/an)</label>
-            <input type="number" id="remb_mobilite" placeholder="ex: 0" oninput="calc()">
+            <label for="remb_mobilite">Forfait mobilités durables (€ / an)</label>
+            <input type="number" id="remb_mobilite" placeholder="ex: 0" inputmode="decimal">
           </div>
           <div class="field">
-            <label>Autres remboursements pro (€/an)</label>
-            <input type="number" id="remb_autres" placeholder="ex: 0" oninput="calc()">
+            <label for="remb_autres">Autres remboursements pro (€ / an)</label>
+            <input type="number" id="remb_autres" placeholder="ex: 0" inputmode="decimal">
           </div>
         </div>
         <div class="info-box">
-          Ces remboursements sont soustraits de tes frais réels. Seul le net déductible compte.
+          Ces remboursements sont soustraits de tes frais réels : seul le net déductible compte. Les IK supérieures au barème fiscal sont imposables (excédent signalé dans les avertissements).
         </div>
       </div>
     </div>
 
     <!-- SECTION 7 : MUTUELLE -->
     <div class="card">
-      <div class="card-header" onclick="toggleCard('mutuelle')">
+      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-mutuelle" onclick="toggleCard('mutuelle')">
         <div class="card-icon">🏥</div>
         <div class="card-title">Mutuelle santé</div>
         <div class="card-toggle" id="toggle-mutuelle">▾</div>
-      </div>
+      </button>
       <div class="card-body" id="body-mutuelle">
         <div class="form-grid single">
           <div class="field">
-            <label>Type de mutuelle</label>
-            <div class="toggle-group mt8" id="mutuelle-type">
-              <button class="toggle-btn active" data-type="entreprise_fiche" onclick="setMutuelle('entreprise_fiche', this)">🏢 Entreprise (déduite fiche de paie)</button>
-              <button class="toggle-btn" data-type="entreprise_6dd" onclick="setMutuelle('entreprise_6dd', this)">📋 Entreprise (non déduite)</button>
-              <button class="toggle-btn" data-type="madelin" onclick="setMutuelle('madelin', this)">💼 TNS / Madelin</button>
-              <button class="toggle-btn" data-type="individuelle" onclick="setMutuelle('individuelle', this)">👤 Individuelle</button>
+            <label id="label-mutuelle">Type de mutuelle</label>
+            <div class="toggle-group mt8" id="mutuelle-type" role="group" aria-labelledby="label-mutuelle">
+              <button type="button" class="toggle-btn active" data-type="entreprise_fiche" onclick="setMutuelle('entreprise_fiche', this)">🏢 Entreprise (fiche de paie)</button>
+              <button type="button" class="toggle-btn" data-type="entreprise_6dd" onclick="setMutuelle('entreprise_6dd', this)">📋 Entreprise (non déduite)</button>
+              <button type="button" class="toggle-btn" data-type="madelin" onclick="setMutuelle('madelin', this)">💼 TNS / Madelin</button>
+              <button type="button" class="toggle-btn" data-type="individuelle" onclick="setMutuelle('individuelle', this)">👤 Individuelle</button>
             </div>
           </div>
         </div>
@@ -453,8 +546,8 @@
           <div class="divider">Cotisations à déclarer en case 6DD</div>
           <div class="form-grid">
             <div class="field">
-              <label>Part salariale annuelle (€)<span class="label-hint">montant communiqué par l'employeur</span></label>
-              <input type="number" id="mutuelle_6dd" placeholder="ex: 480" oninput="calc()">
+              <label for="mutuelle_6dd">Part salariale annuelle (€)<span class="label-hint">montant communiqué par l'employeur</span></label>
+              <input type="number" id="mutuelle_6dd" placeholder="ex: 480" inputmode="decimal">
             </div>
           </div>
           <div class="info-box" style="margin-top:12px">
@@ -466,8 +559,8 @@
           <div class="divider">Déduction Madelin (TNS)</div>
           <div class="form-grid">
             <div class="field">
-              <label>Cotisations Madelin annuelles (€)</label>
-              <input type="number" id="mutuelle_madelin" placeholder="ex: 1200" oninput="calc()">
+              <label for="mutuelle_madelin">Cotisations Madelin annuelles (€)</label>
+              <input type="number" id="mutuelle_madelin" placeholder="ex: 1200" inputmode="decimal">
             </div>
           </div>
           <div class="info-box" style="margin-top:12px">
@@ -489,7 +582,7 @@
     <div class="result-card" id="result-card">
       <div class="result-header">
         <div class="result-title">Résultat du calcul</div>
-        <div class="result-sub">Mis à jour en temps réel · <span data-year-display>Barème 2027</span></div>
+        <div class="result-sub">Mis à jour en temps réel · <span data-year-display>Barème 2026</span> · simulation indicative</div>
       </div>
       <div class="result-body">
         <div class="result-grid">
@@ -499,9 +592,9 @@
             <div class="result-item-sub" id="res-jours-sub"></div>
           </div>
           <div class="result-item">
-            <div class="result-item-label">Kilométrage annuel</div>
+            <div class="result-item-label">Kilométrage annuel retenu</div>
             <div class="result-item-value" id="res-km-annuel">—</div>
-            <div class="result-item-sub">Calculé automatiquement</div>
+            <div class="result-item-sub" id="res-km-sub">Calculé automatiquement</div>
           </div>
           <div class="result-item">
             <div class="result-item-label">Frais transport</div>
@@ -521,12 +614,17 @@
           <div class="result-item">
             <div class="result-item-label">Revenu net imposable</div>
             <div class="result-item-value" id="res-revenu-net">—</div>
-            <div class="result-item-sub">Après déduction des frais réels ou abattement 10%</div>
+            <div class="result-item-sub">Après déduction des frais réels ou abattement 10 %</div>
           </div>
           <div class="result-item">
-            <div class="result-item-label">Impôt brut <span data-year-display>2027</span></div>
+            <div class="result-item-label">Impôt brut <span data-year-display>2026</span></div>
             <div class="result-item-value" id="res-impot-brut">—</div>
             <div class="result-item-sub" id="res-impot-brut-sub"></div>
+          </div>
+          <div class="result-item">
+            <div class="result-item-label">Impôt net estimé</div>
+            <div class="result-item-value accent" id="res-impot-net">—</div>
+            <div class="result-item-sub" id="res-impot-net-sub">Après décote et CEHR (estimation)</div>
           </div>
         </div>
 
@@ -544,7 +642,7 @@
             <span class="detail-value" id="d-total-net" style="font-size:20px; color: var(--accent);">—</span>
           </div>
           <div class="detail-row">
-            <span class="detail-label">Abattement forfaitaire 10 %</span>
+            <span class="detail-label">Abattement forfaitaire 10 % (borné)</span>
             <span class="detail-value" id="d-abattement">—</span>
           </div>
           <div class="detail-row">
@@ -563,32 +661,53 @@
             <span class="detail-label">Tranche fiscale appliquée</span>
             <span class="detail-value" id="d-tranche">—</span>
           </div>
+          <div class="detail-row">
+            <span class="detail-label">Décote</span>
+            <span class="detail-value neg" id="d-decote">—</span>
+          </div>
+          <div class="detail-row" id="d-cehr-row" style="display:none;">
+            <span class="detail-label">CEHR (hauts revenus)</span>
+            <span class="detail-value" id="d-cehr">—</span>
+          </div>
+        </div>
+
+        <div class="warnings" id="warnings" aria-live="polite">
+          <div class="warnings-title">⚠ Avertissements</div>
+          <div id="warnings-list"></div>
         </div>
 
         <div class="export-section">
           <div class="export-dropdown">
-            <button class="export-dropdown-btn btn" onclick="showExportMenu()">📄 Exporter pour la déclaration</button>
+            <button type="button" class="export-dropdown-btn btn" onclick="showExportMenu()">📄 Exporter pour la déclaration</button>
             <div class="export-menu" id="export-menu">
-              <button class="export-btn" onclick="exportCalculs('txt'); showExportMenu();">
+              <button type="button" class="export-btn" onclick="exportCalculs('txt'); showExportMenu();">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/></svg>
-                TXT (Déclaration complète)
+                TXT (déclaration complète)
               </button>
-              <button class="export-btn" onclick="exportCalculs('json'); showExportMenu();">
+              <button type="button" class="export-btn" onclick="exportCalculs('json'); showExportMenu();">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4Z"/></svg>
-                JSON (Données structurées)
+                JSON (données structurées + état réimportable)
               </button>
-              <button class="export-btn" onclick="exportCalculs('csv'); showExportMenu();">
+              <button type="button" class="export-btn" onclick="exportCalculs('csv'); showExportMenu();">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17,4H19V0H15V2H17M13,4H15V0H9V2H13M9,4H11V0H7V2H9M19,8H22V6H19M17,8H19V6H15V8H17M13,8H15V6H9V8H13M9,8H11V6H7V8H9M21,12H24V10H21M19,12H21V10H17V12H19M15,12H17V10H13V12H15M11,12H13V10H9V12H11M7,12H9V10H5V12H7M22,16H24V14H22M20,16H22V14H18V16H20M16,16H18V14H14V16H16M12,16H14V14H10V16H12M10,16H12V14H8V16H10M6,16H8V14H4V16H6M23,20H24V18H23M21,20H23V18H19V20H21M17,20H19V18H15V20H17Z"/></svg>
-                CSV (Tableur compatible)
+                CSV (tableur compatible)
               </button>
             </div>
           </div>
         </div>
 
+        <div class="actions-bar">
+          <button type="button" class="btn btn-secondary" id="btn-print" onclick="window.print()">🖨 Imprimer la fiche</button>
+          <button type="button" class="btn btn-secondary" id="btn-share" onclick="copyShareLink()">🔗 Copier le lien</button>
+          <button type="button" class="btn btn-secondary" id="btn-import" onclick="document.getElementById('file-import').click()">📥 Importer JSON</button>
+          <input type="file" id="file-import" accept="application/json,.json" class="hidden" aria-label="Importer un fichier JSON">
+          <button type="button" class="btn btn-secondary" id="btn-reset" onclick="resetState()">🗑 Réinitialiser</button>
+        </div>
+
         <div id="verdict-box" class="verdict neutral mt16">
           <div class="verdict-icon">⏳</div>
           <div class="verdict-text">
-            <strong>En attente de données</strong>
+            <strong>En attente de données</strong><br>
             Saisis ton salaire et tes frais pour voir si les frais réels sont avantageux.
           </div>
         </div>
@@ -599,7 +718,9 @@
 
 <footer>
   <div class="footer-inner">
-    <span class="footer-version">v2.0.0 · Barème 2027 (revenus 2026)</span>
+    <span class="footer-version" id="footer-version">—</span>
+    <span class="footer-sep">·</span>
+    <span style="color:rgba(255,255,255,0.55)">Simulateur indicatif — ne remplace pas un conseil fiscal</span>
     <span class="footer-sep">·</span>
     <a class="footer-link" href="https://github.com/0rmx0/frais-reels" target="_blank" rel="noopener">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align:-3px;margin-right:5px">
@@ -611,4 +732,7 @@
 </footer>
 
 <script src="config.js"></script>
+<script src="calculs.js"></script>
 <script src="app.js"></script>
+</body>
+</html>
