@@ -204,7 +204,7 @@
       <div class="card-body open" id="body-fiscal">
         <div class="form-grid">
           <div class="field">
-            <label for="salaire">Salaire brut annuel (€)<span class="label-hint">avant impôts, case 1AJ</span></label>
+            <label for="salaire">Salaire net imposable annuel (€)<span class="label-hint">case 1AJ — montant de la fiche de paie, après cotisations sociales</span></label>
             <input type="number" id="salaire" placeholder="ex: 42000" inputmode="decimal">
           </div>
           <div class="field">
@@ -703,6 +703,7 @@
           <input type="file" id="file-import" accept="application/json,.json" class="hidden" aria-label="Importer un fichier JSON">
           <button type="button" class="btn btn-secondary" id="btn-reset" onclick="resetState()">🗑 Réinitialiser</button>
         </div>
+        <p class="label-hint" style="margin:8px 0 0">🔗 Le lien de partage embarque tes saisies en clair (base64) dans l'URL — lisible dans l'historique du navigateur et les journaux des serveurs : ne le transmets qu'à toi-même.</p>
 
         <div id="verdict-box" class="verdict neutral mt16">
           <div class="verdict-icon">⏳</div>

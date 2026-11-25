@@ -13,10 +13,10 @@ Simulateur **100 % client-side** pour comparer les **frais réels** et l'**abatt
 - **Télétravail** : forfait 2,70 €/jour plafonné à 626,40 €/an (désactivé si allocation employeur exonérée), formation, documentation, autres frais.
 - **Remboursements employeur** soustraits (seul le net est déductible), avec alerte si IK > barème fiscal.
 - **Mutuelle** : entreprise (fiche de paie / case 6DD), Madelin (TNS), individuelle (non déductible).
-- **Impôt** : barème progressif par part, **plafonnement du quotient familial**, **décote**, **CEHR** → impôt brut *et* impôt net estimé.
+- **Impôt** : barème progressif par part, **plafonnement du quotient familial**, **décote**, **CEHR** (mention de la **CDHR** au-delà des seuils) → impôt brut *et* impôt net estimé.
 - **Années** : barèmes 2026 (officiels) et 2027 (provisoires, publiés au printemps 2027).
 - **Avertissements contextuels** (40 km, plafonds dépassés, IK excédentaires…).
-- **Vie privée** : aucune donnée ne quitte ton navigateur. Sauvegarde automatique en `localStorage`, **lien partageable** (`?s=…`), export/import JSON, exports **TXT / JSON / CSV**, impression de la fiche récapitulative.
+- **Vie privée** : aucune donnée ne quitte ton navigateur. Sauvegarde automatique en `localStorage`, **lien partageable** (`?s=…`, données en clair dans l'URL — à ne transmettre qu'à soi-même), export/import JSON, exports **TXT / JSON / CSV**, impression de la fiche récapitulative.
 - **PWA** : installable et utilisable hors-ligne. Mode sombre automatique. Accessible clavier (WCAG 2.1 AA visé).
 
 ## Utilisation

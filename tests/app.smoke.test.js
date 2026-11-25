@@ -162,7 +162,8 @@ test('smoke : buildExportData contient l\'état réimportable et les résultats'
   const data = sb.buildExportData();
   assert.ok(data.state && data.state.f);
   assert.equal(data.results.totalFraisNets > 0, true);
-  assert.match(data.declaration.case1AK_transport, /€/);
+  assert.match(data.declaration.case1AK_totalFraisReels, /€/);
+  assert.match(data.declaration.remboursementsReintegres, /€/);
   assert.equal(data.metadata.fiscalYear, 2026);
 });
 
