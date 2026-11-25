@@ -160,7 +160,8 @@ test('smoke : buildExportData contient l\'état réimportable et les résultats'
   $('energie').value = 'thermique';
   sb.calc();
   const data = sb.buildExportData();
-  assert.ok(data.state && data.state.f);
+  assert.ok(data.state && data.state.d1 && data.state.d1.f && data.state.d2);
+  assert.equal(data.foyer.couple, false);
   assert.equal(data.results.totalFraisNets > 0, true);
   assert.match(data.declaration.case1AK_totalFraisReels, /€/);
   assert.match(data.declaration.remboursementsReintegres, /€/);
@@ -181,4 +182,37 @@ test('smoke : restauration depuis localStorage', () => {
   // on simule en réappliquant via applyState
   sb2.applyState(saved);
   assert.equal((sb2.__byId.get('salaire') || sb2.document.getElementById('salaire')).value, '61000');
+});
+
+test('smoke : mode couple — migration état v1, onglets déclarants, abattement 10 % par déclarant', () => {
+  const sb = makeSandbox();
+  const $ = (id) => sb.__byId.get(id) || sb.document.getElementById(id);
+  // Ancien format v1 (lien de partage / localStorage) : un seul bloc f plat
+  const legacy = {
+    year: 2026, transport: 'voiture', repasType: 'classique', mutuelle: 'entreprise_fiche',
+    situation: 'couple', f: { salaire: '40000', nombre_parts: '2' }
+  };
+  assert.equal(sb.applyState(legacy), true);
+  assert.equal($('salaire').value, '40000');
+  assert.equal($('nombre_parts').value, '2');
+  assert.equal($('situation').value, 'couple');
+  // On passe sur le déclarant 2 et on saisit son salaire
+  sb.switchDeclarant('d2');
+  $('salaire').value = '30000';
+  sb.calc();
+  const state = sb.readState();
+  assert.equal(state.active, 'd2');
+  assert.equal(state.d1.f.salaire, '40000');
+  assert.equal(state.d2.f.salaire, '30000');
+  const res = sb.Calculs.computeFoyer(state, sb.getConfig(2026));
+  assert.equal(res.couple, true);
+  assert.equal(res.abattementFoyer, 7000); // 4 000 + 3 000, PAR déclarant
+  assert.equal(res.nombreParts, 2);
+  assert.equal(res.declaration.case1AJ, 40000);
+  assert.equal(res.declaration.case2AJ, 30000);
+  assert.equal($('compare-table').classList.contains('hidden'), false);
+  assert.match($('salaire-case-tag').textContent, /2AJ/);
+  // Retour au déclarant 1 : ses saisies sont conservées
+  sb.switchDeclarant('d1');
+  assert.equal($('salaire').value, '40000');
 });
