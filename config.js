@@ -17,7 +17,7 @@
   }
 })(typeof self !== 'undefined' ? self : this, function () {
 
-const VERSION = '2.1.2';
+const VERSION = '2.2.0';
 
 // Barème kilométrique officiel (d = distance annuelle en km à titre professionnel).
 // Structure : pour chaque type de véhicule, des seuils de distance et, par

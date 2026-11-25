@@ -3,6 +3,18 @@
 Toutes les évolutions notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le versionnage sémantique.
 
+## [2.2.0] — 2026-11-25
+
+### Refonte graphique
+- **Nouvelle direction visuelle** « blueprint de déclaration » : fond ardoise nuit `#0D1520` avec grille millimétrée, formulaire en cartes papier `#F7F3EA`, panneau résultat en écran de contrôle `#111C2B`, accent ambre `#FFB000` (cases à remplir, CTA unique), tampon « SIMULATION » incliné.
+- **Typographie** : Fraunces (titres, éditorial) + Space Grotesk (UI) + IBM Plex Mono (montants, cases, statut) via fonts.bunny.net (CSP mise à jour).
+- **Icônes** : tous les emoji remplacés par des icônes vectorielles Lucide inline (sections, actions, exports, avertissements, verdict).
+- **Détails** : étiquettes « CASE 1AJ / 6DD » en mono ambre, segmented controls à pilule active, chevrons animés, ligne de statut fixe en bas de page.
+- **Dialogues natifs supprimés** : `alert`/`confirm`/`prompt` remplacés par la ligne de statut ; réinitialisation en double clic avec état « Confirmer ? ».
+- Nouveau logo `icon.svg` (ardoise + € ambre), `theme-color`/`background_color` du manifest mises à jour, cache service worker `v2.2.0`.
+- **Double thème automatique** : sombre ou clair choisi via `prefers-color-scheme` selon les paramètres système — toutes les couleurs passent par des tokens sémantiques, `theme-color` adaptatif (meta `media`), transition douce de 0,25 s au changement de thème.
+- **Thème sombre 100 % sombre** : plus aucune surface claire en dark — cartes `#182433`, champs creusés `#0F1826`, texte `#E9EEF5`, pilule de toggle active claire `#F5F1E8`, icônes de section ambre sur `#0A101A`, encadrés NOTE et étiquettes CASE en ambre lisible.
+
 ## [2.1.2] — 2026-11-25
 
 ### Corrigé (bug bloquant)

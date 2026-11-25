@@ -27,6 +27,21 @@ const CHECKBOX_IDS = ['circonstances', 'forfait_tt', 'alloc_tt'];
 
 const $ = (id) => document.getElementById(id);
 
+// --- Ligne de statut (remplace alert/confirm/prompt : aucun dialogue bloquant) ---
+const ICON_INFO = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>';
+const ICON_WARN = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>';
+const ICON_OK = '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>';
+
+function status(msg) {
+  const line = $('status-line');
+  if (!line) return;
+  const div = document.createElement('div');
+  div.className = 'status-msg';
+  div.textContent = msg;
+  line.appendChild(div);
+  while (line.children.length > 2) line.removeChild(line.firstChild);
+}
+
 // --- DOM READY ---
 document.addEventListener('DOMContentLoaded', function () {
   initYearSelector();
@@ -271,23 +286,41 @@ function copyShareLink() {
   const url = location.origin + location.pathname + '?s=' + encodeShare(readState());
   const btn = $('btn-share');
   const done = () => {
+    status('Lien de partage copié dans le presse-papiers.');
     if (!btn) return;
-    const old = btn.textContent;
-    btn.textContent = '✅ Lien copié !';
-    setTimeout(() => { btn.textContent = old; }, 2000);
+    const old = btn.innerHTML;
+    btn.textContent = 'Lien copié !';
+    setTimeout(() => { btn.innerHTML = old; }, 2000);
   };
   if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(done).catch(() => { prompt('Copie le lien :', url); });
+    navigator.clipboard.writeText(url).then(done).catch(() => { status('Lien à copier : ' + url); });
   } else {
-    prompt('Copie le lien :', url);
+    status('Lien à copier : ' + url);
   }
 }
 
+let resetArmed = false;
+let resetTimer = null;
 function resetState() {
-  if (!confirm('Effacer toutes les saisies enregistrées localement ?')) return;
+  const btn = $('btn-reset');
+  if (!resetArmed) {
+    resetArmed = true;
+    if (btn) { btn.classList.add('armed'); btn.textContent = 'Confirmer ?'; }
+    status('Clique encore sur « Réinitialiser » pour effacer toutes les saisies locales.');
+    clearTimeout(resetTimer);
+    resetTimer = setTimeout(() => {
+      resetArmed = false;
+      if (btn) { btn.classList.remove('armed'); btn.innerHTML = 'Réinitialiser'; }
+    }, 3500);
+    return;
+  }
+  clearTimeout(resetTimer);
+  resetArmed = false;
+  if (btn) { btn.classList.remove('armed'); }
   try { localStorage.removeItem(STATE_KEY); } catch (e) {}
   history.replaceState(null, '', location.pathname);
   applyState(defaultState());
+  status('Saisies effacées — retour à l\'état initial.');
 }
 
 function initImport() {
@@ -303,7 +336,7 @@ function initImport() {
         const state = obj && obj.state ? obj.state : obj;
         applyState(state);
       } catch (e) {
-        alert('Fichier JSON invalide.');
+        status('Fichier JSON invalide — import annulé.');
       }
       input.value = '';
     };
@@ -429,7 +462,7 @@ function render(state, config, res) {
   const v = res.verdict;
   const box = $('verdict-box');
   box.className = `verdict ${v.kind}`;
-  const icon = v.kind === 'good' ? '✅' : v.kind === 'bad' ? '⚠️' : '⏳';
+  const icon = v.kind === 'good' ? ICON_OK : v.kind === 'bad' ? ICON_WARN : ICON_INFO;
   box.innerHTML = `<div class="verdict-icon">${icon}</div><div class="verdict-text"><strong></strong><br><span></span></div>`;
   box.querySelector('strong').textContent = v.title;
   box.querySelector('.verdict-text span').textContent = v.text;
@@ -450,7 +483,7 @@ function renderWarnings(warnings) {
     item.className = `warning-item ${w.level === 'info' ? 'info' : ''}`;
     const icon = document.createElement('span');
     icon.className = 'warning-icon';
-    icon.textContent = w.level === 'info' ? 'ℹ️' : '⚠️';
+    icon.innerHTML = w.level === 'info' ? ICON_INFO : ICON_WARN;
     const text = document.createElement('span');
     text.textContent = w.text;
     item.appendChild(icon);
