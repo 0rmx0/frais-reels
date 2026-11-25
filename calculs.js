@@ -50,7 +50,8 @@
   function baremeKm(type, cv, km, electrique, config) {
     const bareme = config.baremeKm[type];
     if (!bareme || km <= 0) return { montant: 0, tranche: 0, taux: 0, fixe: 0, majoration: 1 };
-    const ligne = bareme.cv[cv] || bareme.cv[Object.keys(bareme.cv)[0]];
+    const keys = Object.keys(bareme.cv);
+    const ligne = bareme.cv[cv] || bareme.cv[keys[keys.length - 1]];
     let tranche = 0;
     for (let i = 0; i < bareme.seuilsKm.length; i++) {
       if (km <= bareme.seuilsKm[i]) { tranche = i; break; }
@@ -86,7 +87,9 @@
     if (type === 'voiture' || type === 'moto' || type === 'cyclomoteur') {
       const electrique = f.energie === 'electrique';
       const cv = type === 'cyclomoteur' ? '' : (f.cv || '');
-      const b = baremeKm(type, cv, kmAnnuel, electrique, config);
+      const b = (type !== 'cyclomoteur' && !f.cv)
+        ? { montant: 0, tranche: 0, taux: 0, fixe: 0, majoration: 1 }
+        : baremeKm(type, cv, kmAnnuel, electrique, config);
       // Péages, stationnement et intérêts d'emprunt s'ajoutent au barème
       const peage = n(f.peage);
       const parking = n(f.parking);
@@ -293,6 +296,17 @@
     if (res.transport.detail.depassement40km) {
       w.push({ level: 'warn', text: `Distance aller > ${config.limiteKmTrajet} km : seuls ${config.limiteKmTrajet} km par trajet (${config.limiteKmTrajet * 2} km/jour) sont retenus, sauf circonstances particulières cochées (note à joindre à la déclaration).` });
     }
+    const td = res.transport.detail;
+    if ((td.type === 'voiture' || td.type === 'moto') && !td.cv && td.kmAnnuel > 0) {
+      w.push({ level: 'warn', text: "Puissance fiscale non renseignée : le barème kilométrique n'est pas appliqué (hors péages, stationnement, intérêts d'emprunt)." });
+    }
+    const nbRepas = (res.repas.repas ? res.repas.repas.nb : 0) + (res.repas.tickets ? res.repas.tickets.nb : 0);
+    if (nbRepas > 0 && res.jours.joursOuvres > 0 && nbRepas > res.jours.joursOuvres) {
+      w.push({ level: 'warn', text: `Nombre de repas (${nbRepas}) supérieur aux jours ouvrés (${res.jours.joursOuvres}) : un seul repas déductible par jour travaillé, vérifie ta saisie.` });
+    }
+    if (res.impot.cehr > 0) {
+      w.push({ level: 'info', text: "Hauts revenus : outre la CEHR, la CDHR (art. 224 CGI, taux minimal d'imposition de 20 %, reconduit par la LF 2026) peut aussi s'appliquer aux résidents fiscaux français." });
+    }
     const repas = res.repas;
     if (repas.repas && repas.repas.plafonne) {
       w.push({ level: 'warn', text: `Coût du repas supérieur au plafond de ${config.plafondRepas.toFixed(2)} € : la dépense retenue est plafonnée (déduction max ${(config.plafondRepas - config.forfaitRepas).toFixed(2)} €/repas).` });
@@ -344,7 +358,8 @@
     const abattement10Pct = abattementForfaitaire(salaire, config);
 
     const deductionRetenue = Math.max(totalFraisNets, abattement10Pct);
-    const revenuNetImposable = Math.max(0, salaire - deductionRetenue);
+    const deduction6DD = state.mutuelle === 'entreprise_6dd' ? mutuelle.deductible : 0;
+    const revenuNetImposable = Math.max(0, salaire - deductionRetenue - deduction6DD);
     const gain = totalFraisNets - abattement10Pct;
 
     const impot = calculImpot(revenuNetImposable, nombreParts, situation, config);
@@ -373,6 +388,7 @@
       situation,
       abattement10Pct,
       deductionRetenue,
+      deduction6DD,
       gain,
       revenuNetImposable,
       impot,
@@ -380,9 +396,11 @@
     };
     res.warnings = computeWarnings(state, config, res);
     res.declaration = {
-      case1AK: transport.frais,
-      case1BK: repas.deductible,
-      case1CK: autresFrais.total,
+      case1AK: totalFraisBruts,
+      detailTransport: transport.frais,
+      detailRepas: repas.deductible,
+      detailAutres: autresFrais.total,
+      remboursementsReintegres: remboursements.total,
       mutuelleCase: mutuelle.deductible > 0 ? `${mutuelle.case} (${mutuelle.formulaire})` : null,
       mutuelleMontant: mutuelle.deductible
     };

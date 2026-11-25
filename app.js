@@ -237,7 +237,7 @@ function encodeShare(state) {
 
 function decodeShare(s) {
   const b64 = s.replace(/-/g, '+').replace(/_/g, '/');
-  const bin = atob(b64);
+  const bin = atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4));
   return decodeURIComponent(bin.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
 }
 
@@ -466,7 +466,7 @@ function buildExportData() {
     },
     state, // réimportable via le bouton « Importer JSON »
     situation: {
-      salaireBrut: res.salaire,
+      salaireNetImposable: res.salaire,
       nombreParts: res.impot.nombreParts,
       situationFamiliale: res.situation,
       joursOuvres: res.jours.joursOuvres,
@@ -496,9 +496,11 @@ function buildExportData() {
     },
     warnings: res.warnings.map(w => w.text),
     declaration: {
-      case1AK_transport: fmt(res.declaration.case1AK),
-      case1BK_repas: fmt(res.declaration.case1BK),
-      case1CK_autres: fmt(res.declaration.case1CK),
+      case1AK_totalFraisReels: fmt(res.declaration.case1AK),
+      detailTransport: fmt(res.declaration.detailTransport),
+      detailRepas: fmt(res.declaration.detailRepas),
+      detailAutres: fmt(res.declaration.detailAutres),
+      remboursementsReintegres: fmt(res.declaration.remboursementsReintegres),
       mutuelle: res.declaration.mutuelleCase ? `${res.declaration.mutuelleCase} : ${fmt(res.declaration.mutuelleMontant)}` : res.mutuelle.info
     }
   };
@@ -518,15 +520,17 @@ function exportJSON(data) {
 function exportCSV(data) {
   const headers = ['Catégorie', 'Libellé', 'Valeur', 'Unité', 'Case déclaration'];
   const rows = [
-    ['Situation', 'Salaire brut annuel', data.situation.salaireBrut, '€', '1AJ'],
+    ['Situation', 'Salaire net imposable annuel', data.situation.salaireNetImposable, '€', '1AJ'],
     ['Situation', 'Nombre de parts fiscales', data.situation.nombreParts, '', ''],
     ['Situation', 'Situation familiale', data.situation.situationFamiliale, '', ''],
     ['Situation', 'Jours au bureau', data.situation.joursBureau, 'jours', ''],
     ['Situation', 'Kilométrage annuel retenu', data.transport.kmAnnuel, 'km', ''],
     ['', '', '', '', ''],
-    ['Transport', data.transport.label, data.transport.fraisTransport, '€', '1AK'],
-    ['Repas', `Type : ${data.repas.type}`, data.repas.deductible, '€', '1BK'],
-    ['Autres frais', 'Total autres frais', data.autresFrais.total, '€', '1CK'],
+    ['Transport', `${data.transport.label} (détail)`, data.transport.fraisTransport, '€', ''],
+    ['Repas', `Type : ${data.repas.type} (détail)`, data.repas.deductible, '€', ''],
+    ['Autres frais', 'Total autres frais (détail)', data.autresFrais.total, '€', ''],
+    ['Frais réels', 'Total frais réels bruts à reporter (déclarant 1)', data.results.totalFraisBruts, '€', '1AK'],
+    ['Frais réels', "Remboursements employeur à réintégrer au revenu (option frais réels)", data.remboursements.total, '€', '1GB-1JB'],
     ['', '', '', '', ''],
     ['Remboursements', 'Total remboursements employeur', -data.remboursements.total, '€', ''],
     ['', '', '', '', ''],
@@ -541,9 +545,11 @@ function exportCSV(data) {
     ['Résultats', 'Impôt net estimé', data.results.impotNetEstime, '€', ''],
     ['Résultats', 'Tranche fiscale', data.results.tranche, '', ''],
     ['', '', '', '', ''],
-    ['Déclaration', 'Case 1AK (transport)', data.declaration.case1AK_transport, '', '1AK'],
-    ['Déclaration', 'Case 1BK (repas)', data.declaration.case1BK_repas, '', '1BK'],
-    ['Déclaration', 'Case 1CK (autres frais)', data.declaration.case1CK_autres, '', '1CK'],
+    ['Déclaration', 'Case 1AK — total des frais réels (déclarant 1)', data.declaration.case1AK_totalFraisReels, '', '1AK'],
+    ['Déclaration', 'Détail transport', data.declaration.detailTransport, '', ''],
+    ['Déclaration', 'Détail repas', data.declaration.detailRepas, '', ''],
+    ['Déclaration', 'Détail autres frais', data.declaration.detailAutres, '', ''],
+    ['Déclaration', 'Remboursements à réintégrer (1GB-1JB)', data.declaration.remboursementsReintegres, '', '1GB-1JB'],
     ['Déclaration', 'Mutuelle', data.declaration.mutuelle, '', ''],
     ['', '', '', '', ''],
     ['Conseil', data.results.verdict, '', '', '']
@@ -574,17 +580,19 @@ function exportTXT(data) {
     'Sources : impots.gouv.fr · BOFiP · service-public.fr',
     '',
     '--- SITUATION ---',
-    `Salaire brut annuel (1AJ) : ${fmt(data.situation.salaireBrut)}`,
+    `Salaire net imposable annuel (1AJ) : ${fmt(data.situation.salaireNetImposable)}`,
     `Parts fiscales : ${fmtNumber(data.situation.nombreParts, 1)} · Situation : ${data.situation.situationFamiliale}`,
     `Jours ouvrés ${data.situation.joursOuvres} − arrêts ${data.situation.joursArret} − télétravail ${data.situation.joursTeletravail} = ${data.situation.joursBureau} jours au bureau`,
     `Kilométrage annuel retenu : ${fmtNumber(t.kmAnnuel)} km`,
     '',
     '--- FRAIS DÉDUCTIBLES ---',
-    `1. Transport (case 1AK) : ${fmt(t.fraisTransport)}`,
+    `1. Transport (détail) : ${fmt(t.fraisTransport)}`,
     `   ${t.label}${t.cv ? ' · ' + t.cv + ' CV' : ''}${t.energie === 'electrique' ? ' · électrique +20 %' : ''}`,
     baremeLine,
-    `2. Repas (case 1BK) : ${fmt(r.deductible)}  (type : ${r.type} ; forfait repas ${fmt(c.forfaitRepas)} ; plafond ${fmt(c.plafondRepas)}/repas)`,
-    `3. Autres frais (case 1CK) : ${fmt(data.autresFrais.total)}`,
+    `2. Repas (détail) : ${fmt(r.deductible)}  (type : ${r.type} ; forfait repas ${fmt(c.forfaitRepas)} ; plafond ${fmt(c.plafondRepas)}/repas)`,
+    `3. Autres frais (détail) : ${fmt(data.autresFrais.total)}`,
+    `Total frais réels bruts à reporter en case 1AK (déclarant 1) : ${fmt(res.totalFraisBruts)}`,
+    `Remboursements employeur à réintégrer au revenu (cases 1GB-1JB) : ${fmt(data.remboursements.total)}`,
     `   Télétravail ${fmt(data.autresFrais.teletravail)} · Formation ${fmt(data.autresFrais.formation)} · Documentation ${fmt(data.autresFrais.documentation)} · Autres ${fmt(data.autresFrais.autres)}`,
     '',
     `Total frais bruts : ${fmt(res.totalFraisBruts)}`,
@@ -604,9 +612,9 @@ function exportTXT(data) {
     `Impôt net estimé : ${fmt(res.impotNetEstime)}`,
     '',
     '--- À REPORTER SUR LA 2042 ---',
-    `Case 1AK (transport) : ${d.case1AK_transport}`,
-    `Case 1BK (repas) : ${d.case1BK_repas}`,
-    `Case 1CK (autres frais) : ${d.case1CK_autres}`,
+    `Case 1AK — total des frais réels (déclarant 1) : ${d.case1AK_totalFraisReels}`,
+    `   détail : transport ${d.detailTransport} · repas ${d.detailRepas} · autres ${d.detailAutres}`,
+    `Remboursements à réintégrer (cases 1GB-1JB) : ${d.remboursementsReintegres}`,
     `Mutuelle : ${d.mutuelle}`,
     '',
     '--- CONSEIL ---',

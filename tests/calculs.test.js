@@ -195,3 +195,56 @@ test('année 2027 marquée provisoire', () => {
   assert.equal(cfg.getConfig(2026).provisoire, false);
   assert.equal(cfg.getLatestOfficialYear(), 2026);
 });
+
+// --- Conformité / robustesse (audit) ---
+
+test('barème km : CV hors plage (8) => dernière ligne « 7 CV et plus »', () => {
+  const b8 = Calculs.baremeKm('voiture', '8', 4000, false, CONFIG);
+  const b7 = Calculs.baremeKm('voiture', '7', 4000, false, CONFIG);
+  assert.equal(b8.montant, b7.montant);
+  const m6 = Calculs.baremeKm('moto', '6', 4000, false, CONFIG);
+  const m5 = Calculs.baremeKm('moto', '5+', 4000, false, CONFIG);
+  assert.equal(m6.montant, m5.montant);
+});
+
+test('compute : voiture sans CV sélectionnée => barème non appliqué + avertissement', () => {
+  const res = Calculs.compute(baseState({
+    f: { salaire: '40000', jours_ouvres: '220', dist_aller: '22', energie: 'thermique' }
+  }), CONFIG);
+  assert.equal(res.transport.frais, 0);
+  assert.ok(res.warnings.some(w => w.text.includes('Puissance fiscale')));
+});
+
+test('compute : mutuelle entreprise 6DD déduite du revenu net imposable', () => {
+  const base = Calculs.compute(baseState({ f: { salaire: '40000', nombre_parts: '1' } }), CONFIG);
+  const avec = Calculs.compute(baseState({
+    mutuelle: 'entreprise_6dd',
+    f: { salaire: '40000', nombre_parts: '1', mutuelle_6dd: '600' }
+  }), CONFIG);
+  assert.ok(Math.abs((base.revenuNetImposable - avec.revenuNetImposable) - 600) < 0.01);
+  assert.equal(avec.deduction6DD, 600);
+});
+
+test('déclaration : case 1AK = total des frais réels bruts (pas le seul transport)', () => {
+  const res = Calculs.compute(baseState({
+    f: {
+      salaire: '45000', jours_ouvres: '220', dist_aller: '22', cv: '5', energie: 'thermique',
+      nb_repas_classique: '200', cout_repas_classique: '12'
+    }
+  }), CONFIG);
+  assert.ok(Math.abs(res.declaration.case1AK - res.totalFraisBruts) < 0.01);
+  assert.ok(Math.abs(res.declaration.detailTransport - res.transport.frais) < 0.01);
+});
+
+test('avertissement : nombre de repas > jours ouvrés', () => {
+  const res = Calculs.compute(baseState({
+    f: { salaire: '40000', jours_ouvres: '200', nb_repas_classique: '220', cout_repas_classique: '12' }
+  }), CONFIG);
+  assert.ok(res.warnings.some(w => w.text.includes('jours ouvr')));
+});
+
+test('avertissement CDHR au-delà des seuils de la CEHR', () => {
+  const res = Calculs.compute(baseState({ f: { salaire: '300000', nombre_parts: '1' } }), CONFIG);
+  assert.ok(res.impot.cehr > 0);
+  assert.ok(res.warnings.some(w => w.text.includes('CDHR')));
+});

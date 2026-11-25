@@ -3,6 +3,22 @@
 Toutes les évolutions notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le versionnage sémantique.
 
+## [2.1.1] — 2026-11-25
+
+### Corrigé (justesse fiscale et conformité légale)
+- **Cases de la 2042** : les exports indiquaient « 1AK = transport, 1BK = repas, 1CK = autres » — faux. Les cases 1AK/1BK/1CK/1DK servent à reporter le **total des frais réels** par membre du foyer (1AK = déclarant 1) ; le détail relève de l'état détaillé des frais réels. Correction des exports TXT/JSON/CSV.
+- **Remboursements employeur** : en cas d'option pour les frais réels, les remboursements exonérés (IK, part titres-restaurant, allocation télétravail) perdent leur exonération et doivent être **réintégrés au revenu (cases 1GB-1JB)** — note ajoutée aux exports.
+- **Mutuelle entreprise (case 6DD, 2042 C)** : le montant était affiché mais **non déduit du revenu net imposable** ; c'est une charge déductible, il est désormais retranché du revenu imposable (et du RFR approximé pour la CEHR).
+- **Salaire saisi** : l'étiquette « brut annuel, case 1AJ » était trompeuse — la case 1AJ correspond au **salaire net imposable** (fiche de paie, après cotisations), base de l'abattement de 10 %. Libellé corrigé dans l'UI et les exports.
+- **Barème kilométrique** : une puissance hors liste (ex. 8 CV) retombait sur la ligne « 3 CV » au lieu de « 7 CV et plus » (dernière ligne du tableau officiel) ; si aucune puissance n'est sélectionnée, le barème n'est plus appliqué silencieusement (montant 0 + avertissement).
+- **Avertissements** : alerte si le nombre de repas dépasse les jours ouvrés (1 repas/jour travaillé), et information **CDHR** (art. 224 CGI, taux minimal 20 %, reconduit par la LF 2026) au-delà des seuils de la CEHR.
+- **Lien de partage** : padding base64 restauré (robustesse) et avertissement de confidentialité ajouté — les saisies sont embarquées en clair (base64) dans l'URL.
+
+### Vérifié (barèmes 2026 = revenus 2025, sans changement)
+- Barème kilométrique gelé depuis l'arrêté du 27/03/2023 (voitures 3-7 CV et plus, motos, cyclomoteurs, majoration +20 % électrique) : conforme au jeu data.gouv.fr « Barème kilométrique fiscal France 2022-2026 » et à service-public.fr.
+- Tranches IR 11 600 / 29 579 / 84 577 / 181 917 € (LF 2026, loi n° 2026-103 du 19/02/2026) ; abattement 10 % borné 509-14 555 € ; décote 897/1 483 € − 45,25 % ; plafond du quotient familial 1 807 €/demi-part ; CEHR 3 %/4 % (seuils 250 000/500 000 € et doublés, inchangés).
+- Repas : forfait 5,45 €, plafond 21,10 € ; titres-restaurant : part employeur exonérée ≤ 7,32 € (50-60 % de la valeur) ; télétravail : 2,70 €/jour, plafond 626,40 €/an.
+
 ## [2.1.0] — 2026-11-04
 
 ### Corrigé (justesse fiscale)
