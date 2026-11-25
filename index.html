@@ -665,7 +665,7 @@
       <div class="card-body" id="body-autres">
         <div class="form-grid">
           <div class="field">
-            <label for="frais_teletravail">Frais de télétravail (€ / an)</label>
+            <label for="frais_teletravail">Frais de télétravail (€ / an)<span class="label-hint">réel, justifié</span></label>
             <input type="number" id="frais_teletravail" placeholder="ex : 300" inputmode="decimal">
           </div>
           <div class="field span2">
@@ -678,18 +678,99 @@
               <span>Mon employeur me verse une <strong>allocation télétravail exonérée</strong> → frais de télétravail non déductibles</span>
             </label>
           </div>
+        </div>
+
+        <div class="divider">Frais déductibles avec règle de calcul — champs dédiés</div>
+        <div class="form-grid">
           <div class="field">
-            <label for="frais_formation">Frais de formation (€ / an)</label>
+            <label for="frais_syndicat">Cotisations syndicales (€ / an)<span class="label-hint">100 % déductibles en frais réels ; exclusif du crédit d'impôt de 66 % (forfait 10 %)</span></label>
+            <input type="number" id="frais_syndicat" placeholder="ex : 150" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_ordre">Ordre professionnel obligatoire (€ / an)<span class="label-hint">médecins, avocats, experts-comptables…</span></label>
+            <input type="number" id="frais_ordre" placeholder="ex : 400" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_assurance_pro">Assurance responsabilité pro (€ / an)<span class="label-hint">primes d'assurance RC professionnelle</span></label>
+            <input type="number" id="frais_assurance_pro" placeholder="ex : 250" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_habillement">Vêtements professionnels (€)<span class="label-hint">tenues spécifiques + entretien ; pas les vêtements d'usage courant</span></label>
+            <input type="number" id="frais_habillement" placeholder="ex : 120" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_materiel">Matériel &lt; 500 € HT (€)<span class="label-hint">fournitures, mobilier, outillage : prix d'achat déductible en totalité l'année d'achat</span></label>
+            <input type="number" id="frais_materiel" placeholder="ex : 300" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_materiel_amorti">Matériel &gt; 500 € HT — annuité (€)<span class="label-hint">saisir l'annuité d'amortissement linéaire (ex : prix ÷ 3 ans)</span></label>
+            <input type="number" id="frais_materiel_amorti" placeholder="ex : 200" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_telephone">Tél. / internet — quote-part pro (€ / an)<span class="label-hint">dépenses nécessitées par la profession ; usage mixte = quote-part justifiée</span></label>
+            <input type="number" id="frais_telephone" placeholder="ex : 240" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_double_residence">Double résidence (€ / an)<span class="label-hint">conjoints exerçant dans des lieux éloignés : hébergement + repas supplémentaires, justifiés</span></label>
+            <input type="number" id="frais_double_residence" placeholder="ex : 1500" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_demenagement">Déménagement pour nouvel emploi (€)<span class="label-hint">hors dépenses de réinstallation du foyer, sur justificatifs</span></label>
+            <input type="number" id="frais_demenagement" placeholder="ex : 2000" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_sejour_etranger">Séjour pro à l'étranger (€)<span class="label-hint">déplacements imposés par l'employeur : hébergement, repas, transports locaux non remboursés</span></label>
+            <input type="number" id="frais_sejour_etranger" placeholder="ex : 800" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_local_pro">Local professionnel — quote-part (€ / an)<span class="label-hint">loyer + charges de la pièce dédiée à l'activité pro, au prorata de la surface</span></label>
+            <input type="number" id="frais_local_pro" placeholder="ex : 1200" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_interets_titres">Intérêts titres de l'entreprise (€)<span class="label-hint">emprunt contracté pour acquérir des titres de l'employeur</span></label>
+            <input type="number" id="frais_interets_titres" placeholder="ex : 300" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_representation">Frais de représentation (€)<span class="label-hint">réception, représentation, gratification (VRP, dirigeants, représentants du personnel)</span></label>
+            <input type="number" id="frais_representation" placeholder="ex : 400" inputmode="decimal">
+          </div>
+          <div class="field">
+            <label for="frais_juridiques">Frais de procès liés au travail (€)<span class="label-hint">ex : honoraires d'avocat en procédure prud'homale</span></label>
+            <input type="number" id="frais_juridiques" placeholder="ex : 600" inputmode="decimal">
+          </div>
+        </div>
+
+        <div class="divider">Formation, documentation, divers</div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="frais_formation">Formation professionnelle (€ / an)<span class="label-hint">diplôme/qualification, stage de perfectionnement, frais de recherche d'emploi (demandeur d'emploi inscrit)</span></label>
             <input type="number" id="frais_formation" placeholder="ex : 200" inputmode="decimal">
           </div>
           <div class="field">
-            <label for="frais_doc">Frais de documentation (€ / an)</label>
+            <label for="frais_doc">Documentation professionnelle (€ / an)<span class="label-hint">ouvrages, revues et abonnements spécifiquement professionnels</span></label>
             <input type="number" id="frais_doc" placeholder="ex : 100" inputmode="decimal">
           </div>
           <div class="field">
             <label for="frais_autres">Autres frais (préciser)</label>
             <input type="number" id="frais_autres" placeholder="ex : 0" inputmode="decimal">
           </div>
+        </div>
+
+        <div class="info-box">
+          <strong>Autres frais professionnels admissibles</strong> (frais réels, sources BOFiP BOI-RSA-BASE-30-50-30 et impots.gouv.fr) — conditions communes : payés par toi, <strong>non remboursés par l'employeur</strong>, <strong>justifiés</strong> (conserve les justificatifs 3 ans) :
+          <ul>
+            <li><strong>Formation, stage, documentation</strong> : diplôme/qualification pour évoluer ou obtenir un nouvel emploi ; stage de perfectionnement lié à ton activité ; frais de recherche d'un nouvel emploi (demandeur d'emploi inscrit ou salarié changeant volontairement d'emploi) ; ouvrages, revues et abonnements <em>spécifiquement</em> professionnels, voyages d'études.</li>
+            <li><strong>Matériel, mobilier, fournitures</strong> : <strong>&lt; 500 € HT/unité</strong> → prix d'achat déductible en totalité l'année d'achat ; <strong>&gt; 500 € HT</strong> → une annuité d'amortissement linéaire (usuellement ÷ 3 ans). Cas particulier du matériel informatique utilisé pour les besoins pro (logiciels pro : totalité ; logiciels mixtes : quote-part).</li>
+            <li><strong>Vêtements</strong> : uniquement les tenues <em>spécifiques</em> à la profession (bleus de travail, souliers spéciaux, EPI, artistes…) + entretien/blanchissage. Les vêtements d'usage courant ne sont pas déductibles.</li>
+            <li><strong>Cotisations professionnelles</strong> : syndicats et associations professionnelles, ordre professionnel obligatoire, primes d'assurance responsabilité professionnelle. En frais réels, les cotisations syndicales sont déductibles à 100 % et ne donnent <em>pas</em> droit au crédit d'impôt de 66 % (réservé au forfait 10 %).</li>
+            <li><strong>Double résidence</strong> (conjoints/partenaires exerçant dans des lieux éloignés, hors convenances personnelles) et <strong>déménagement</strong> pour obtenir un nouvel emploi (hors réinstallation du foyer) : réels sur justificatifs.</li>
+            <li><strong>Séjour à l'étranger</strong> imposé par l'employeur (obligatoire) : hébergement, repas, transports locaux non remboursés.</li>
+            <li><strong>Téléphone / internet</strong> : quote-part nécessitéée par la profession.</li>
+            <li><strong>Local professionnel</strong> : quote-part du loyer et des charges de la pièce dédiée à l'activité (au prorata de la surface).</li>
+            <li><strong>Intérêts d'emprunt</strong> pour l'achat de titres de l'entreprise employeur.</li>
+            <li><strong>Représentation</strong> (VRP, dirigeants, représentants du personnel) et <strong>frais de procès</strong> liés au travail (ex : prud'hommes) : réels, justifiés, en rapport avec la profession.</li>
+          </ul>
+          <strong>Ne sont PAS des frais réels</strong> (crédits/réductions d'impôt séparés ou non déductibles) : frais de garde d'enfants (crédits d'impôt art. 199 sexdecies / 200 quater B CGI), dons aux organismes d'intérêt général (réduction d'impôt art. 200 CGI), frais de santé restant à charge, amendes pénales, cotisations de mutuelle individuelle, vêtements d'usage courant.
         </div>
       </div>
     </div>

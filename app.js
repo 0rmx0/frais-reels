@@ -20,6 +20,10 @@ const FIELD_IDS = [
   'nb_tickets', 'valeur_ticket', 'part_employeur_ticket',
   'nb_repas_mixte', 'cout_repas_mixte', 'nb_tickets_mixte', 'valeur_ticket_mixte', 'part_employeur_ticket_mixte',
   'frais_teletravail', 'frais_formation', 'frais_doc', 'frais_autres',
+  'frais_syndicat', 'frais_ordre', 'frais_assurance_pro', 'frais_habillement',
+  'frais_materiel', 'frais_materiel_amorti', 'frais_telephone', 'frais_double_residence',
+  'frais_demenagement', 'frais_sejour_etranger', 'frais_local_pro', 'frais_interets_titres',
+  'frais_representation', 'frais_juridiques',
   'remb_ik', 'remb_carburant', 'remb_mobilite', 'remb_autres',
   'mutuelle_6dd', 'mutuelle_madelin'
 ];
@@ -419,9 +423,12 @@ function render(state, config, res) {
   $('res-repas').textContent = fmt(res.repas.deductible);
   $('res-repas-sub').textContent = repasSub(res);
   $('res-autres').textContent = fmt(res.autresFrais.total);
-  $('res-autres-sub').textContent = res.autresFrais.forfaitTT !== null
-    ? `dont forfait télétravail ${fmt(res.autresFrais.forfaitTT)}`
-    : 'Télétravail, formation, documentation, autres';
+  const postesActifs = (res.autresFrais.postes || []).filter(p => p.montant > 0);
+  const detailPostes = postesActifs.map(p => `${p.court} ${fmt(p.montant)}`).join(' · ');
+  let subAutres = '';
+  if (res.autresFrais.forfaitTT !== null) subAutres += `forfait télétravail ${fmt(res.autresFrais.forfaitTT)}`;
+  if (detailPostes) subAutres += (subAutres ? ' · ' : '') + detailPostes;
+  $('res-autres-sub').textContent = subAutres || 'Télétravail, formation, documentation, autres';
 
   // Revenu & impôt
   $('res-revenu-net').textContent = fmt(res.revenuNetImposable);
@@ -627,6 +634,10 @@ function exportCSV(data) {
 function exportTXT(data) {
   const c = getConfig(currentYear);
   const t = data.transport, r = data.repas, res = data.results, d = data.declaration;
+  const postesTxt = (data.autresFrais.postes || [])
+    .filter(p => p.montant > 0)
+    .map(p => `${p.label} : ${fmt(p.montant)}`)
+    .join('\n   ');
   const baremeLine = (t.bareme && t.bareme.taux)
     ? `   Barème : ${fmtNumber(t.kmAnnuel)} km × ${t.bareme.taux.toFixed(3).replace('.', ',')} €/km${t.bareme.fixe ? ' + ' + fmtNumber(t.bareme.fixe) + ' €' : ''}${t.bareme.majoration > 1 ? ' × 1,20 (électrique)' : ''}${t.depassement40km ? ` (limité à ${c.limiteKmTrajet} km/trajet)` : ''}`
     : '';
@@ -652,7 +663,7 @@ function exportTXT(data) {
     `3. Autres frais (détail) : ${fmt(data.autresFrais.total)}`,
     `Total frais réels bruts à reporter en case 1AK (déclarant 1) : ${fmt(res.totalFraisBruts)}`,
     `Remboursements employeur à réintégrer au revenu (cases 1GB-1JB) : ${fmt(data.remboursements.total)}`,
-    `   Télétravail ${fmt(data.autresFrais.teletravail)} · Formation ${fmt(data.autresFrais.formation)} · Documentation ${fmt(data.autresFrais.documentation)} · Autres ${fmt(data.autresFrais.autres)}`,
+    `   Télétravail ${fmt(data.autresFrais.teletravail)} · Formation ${fmt(data.autresFrais.formation)} · Documentation ${fmt(data.autresFrais.documentation)} · Autres ${fmt(data.autresFrais.autres)}` + (postesTxt ? '\n   ' + postesTxt : ''),
     '',
     `Total frais bruts : ${fmt(res.totalFraisBruts)}`,
     `− Remboursements employeur : ${fmt(-data.remboursements.total)}`,

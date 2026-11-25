@@ -190,6 +190,20 @@ test('compute : allocation télétravail => forfait TT non déductible', () => {
   assert.equal(res.autresFrais.teletravail, 0);
 });
 
+test('compute : postes dédiés « autres frais » (BOI-RSA-BASE-30-50-30-40) sommés dans le total', () => {
+  const res = Calculs.compute(baseState({
+    f: { salaire: '40000', frais_syndicat: '150', frais_materiel: '300', frais_materiel_amorti: '200', frais_telephone: '240', frais_juridiques: '600' }
+  }), CONFIG);
+  // 150 + 300 + 200 + 240 + 600 = 1 490 € de postes dédiés
+  assert.equal(res.autresFrais.total, 1490);
+  assert.equal(res.autresFrais.postes.length, 14);
+  const syndicat = res.autresFrais.postes.find(p => p.id === 'frais_syndicat');
+  assert.equal(syndicat.montant, 150);
+  assert.ok(syndicat.label.includes('syndicales'));
+  // le total brut intègre les postes
+  assert.ok(res.totalFraisBruts >= 1490);
+});
+
 test('année 2027 marquée provisoire', () => {
   assert.equal(cfg.getConfig(2027).provisoire, true);
   assert.equal(cfg.getConfig(2026).provisoire, false);

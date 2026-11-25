@@ -150,6 +150,26 @@
 
   // --- AUTRES FRAIS ---
 
+  // Postes de frais professionnels admissibles avec règle propre (champ dédié dans l'UI).
+  // Sources : BOFiP BOI-RSA-BASE-30-50-30-30 et -40 (frais réels des salariés) + impots.gouv.fr.
+  // [id du champ, libellé court (résumé), libellé long (note / exports)]
+  const AUTRES_FRAIS_POSTES = [
+    ['frais_syndicat', 'Syndicat', "Cotisations syndicales — 100 % déductibles en frais réels (exclusif du crédit d'impôt de 66 % au forfait 10 %)"],
+    ['frais_ordre', 'Ordre pro', "Cotisations à un ordre professionnel obligatoire (médecins, avocats, experts-comptables…)"],
+    ['frais_assurance_pro', 'Assurance RC pro', "Primes d'assurance responsabilité professionnelle"],
+    ['frais_habillement', 'Vêtements pro', "Vêtements/tenues spécifiques à la profession + entretien (bleus de travail, EPI… ; pas les vêtements courants)"],
+    ['frais_materiel', 'Matériel < 500 € HT', "Fournitures, mobilier, outillage < 500 € HT/unité : prix d'achat déductible en totalité l'année d'achat"],
+    ['frais_materiel_amorti', 'Matériel > 500 € HT', "Matériel > 500 € HT/unité : saisir l'annuité d'amortissement linéaire (ex : prix ÷ 3 ans)"],
+    ['frais_telephone', 'Tél. / internet', "Quote-part professionnelle téléphone + internet (usage mixte = quote-part justifiée)"],
+    ['frais_double_residence', 'Double résidence', "Double résidence (conjoints exerçant dans des lieux éloignés) : hébergement + repas supplémentaires, justifiés"],
+    ['frais_demenagement', 'Déménagement', "Déménagement pour obtenir un nouvel emploi (hors réinstallation du foyer), sur justificatifs"],
+    ['frais_sejour_etranger', "Séjour pro à l'étranger", "Séjour à l'étranger imposé par l'employeur : hébergement, repas, transports locaux non remboursés"],
+    ['frais_local_pro', 'Local pro', "Quote-part du loyer et des charges de la pièce dédiée à l'activité professionnelle (au prorata de la surface)"],
+    ['frais_interets_titres', 'Intérêts titres société', "Intérêts d'emprunt contracté pour acquérir des titres de l'entreprise employeur"],
+    ['frais_representation', 'Représentation', "Frais de réception, représentation, gratification (VRP, dirigeants, représentants du personnel), en rapport avec la profession"],
+    ['frais_juridiques', 'Frais de procès', "Frais de procès liés au travail (ex : honoraires d'avocat en procédure prud'homale)"]
+  ];
+
   function calculAutresFrais(state, config, ctx) {
     const f = state.f;
     let teletravail = n(f.frais_teletravail);
@@ -163,10 +183,12 @@
     }
     const formation = n(f.frais_formation);
     const doc = n(f.frais_doc);
+    const postes = AUTRES_FRAIS_POSTES.map(([id, court, long]) => ({ id, court, label: long, montant: n(f[id]) }));
+    const totalPostes = postes.reduce((s, p) => s + p.montant, 0);
     const autres = n(f.frais_autres);
     return {
-      teletravail, forfaitTT, formation, documentation: doc, autres,
-      total: teletravail + formation + doc + autres
+      teletravail, forfaitTT, formation, documentation: doc, postes, autres,
+      total: teletravail + formation + doc + totalPostes + autres
     };
   }
 
