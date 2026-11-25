@@ -9,10 +9,15 @@ let currentYear = (typeof getLatestOfficialYear === 'function') ? getLatestOffic
 let currentTransport = 'voiture';
 let currentRepasType = 'classique';
 let currentMutuelle = 'entreprise_fiche';
+// Déclarant en cours d'édition ('d1' ou 'd2') ; le formulaire édite toujours le déclarant actif
+let currentDeclarant = 'd1';
+let declarantCache = { d1: null, d2: null };
 
 const STATE_KEY = 'frais-reels-state-v1';
+// Champs propres à CHAQUE déclarant (salaire = 1AJ/2AJ, frais, remboursements, mutuelle…).
+// 'situation' et 'nombre_parts' restent au niveau du foyer (lus séparément dans readState).
 const FIELD_IDS = [
-  'salaire', 'nombre_parts', 'situation',
+  'salaire',
   'jours_ouvres', 'jours_arret', 'jours_teletravail',
   'dist_aller', 'cv', 'energie', 'cout_abonnement', 'frais_velo',
   'peage', 'parking', 'interets',
@@ -69,6 +74,7 @@ function initButtons() {
   bindToggleGroup('transport-type', setTransport);
   bindToggleGroup('repas-type', setRepasType);
   bindToggleGroup('mutuelle-type', setMutuelle);
+  bindToggleGroup('declarant-type', switchDeclarant);
   const ddBtn = document.querySelector('.export-dropdown-btn');
   if (ddBtn) ddBtn.addEventListener('click', showExportMenu);
   document.querySelectorAll('#export-menu .export-btn').forEach(b => {
@@ -207,50 +213,124 @@ function setMutuelle(type, btn) {
 }
 
 // --- ÉTAT : lecture / sauvegarde / restauration / partage ---
-function readState() {
+// Forme actuelle : { year, situation, nombreParts, active, d1: {...}, d2: {...} }
+// Chaque déclarant : { transport, repasType, mutuelle, f: {id: valeur} }.
+function defaultDeclarant() {
+  const f = {};
+  FIELD_IDS.forEach(id => { f[id] = ''; });
+  CHECKBOX_IDS.forEach(id => { f[id] = ''; });
+  return { transport: 'voiture', repasType: 'classique', mutuelle: 'entreprise_fiche', f };
+}
+
+// Ramasse les champs du formulaire (déclarant actif) dans le cache
+function captureDeclarant() {
   const f = {};
   FIELD_IDS.forEach(id => { const el = $(id); if (el) f[id] = el.value; });
   CHECKBOX_IDS.forEach(id => { const el = $(id); if (el) f[id] = el.checked ? 'on' : ''; });
+  declarantCache[currentDeclarant] = { transport: currentTransport, repasType: currentRepasType, mutuelle: currentMutuelle, f };
+}
+
+function readState() {
+  captureDeclarant();
   return {
     year: currentYear,
-    transport: currentTransport,
-    repasType: currentRepasType,
-    mutuelle: currentMutuelle,
     situation: ($('situation') && $('situation').value) || 'celibataire',
-    f
+    nombreParts: ($('nombre_parts') && $('nombre_parts').value) || '',
+    active: currentDeclarant,
+    d1: declarantCache.d1 || defaultDeclarant(),
+    d2: declarantCache.d2 || defaultDeclarant()
+  };
+}
+
+// Ancien format (v1 : un seul bloc f plat) -> nouveau format à deux déclarants
+function migrateState(state) {
+  if (!state || typeof state !== 'object') return null;
+  if (state.d1 || state.d2) return state;
+  const f = { ...(state.f || {}) };
+  const nombreParts = f.nombre_parts || '';
+  delete f.nombre_parts;
+  delete f.situation;
+  return {
+    year: state.year,
+    situation: state.situation || 'celibataire',
+    nombreParts,
+    active: 'd1',
+    d1: { transport: state.transport || 'voiture', repasType: state.repasType || 'classique', mutuelle: state.mutuelle || 'entreprise_fiche', f },
+    d2: defaultDeclarant()
   };
 }
 
 function applyState(state) {
-  if (!state || typeof state !== 'object') return false;
-  if (state.year && FISCAL_CONFIG[state.year]) {
-    currentYear = parseInt(state.year, 10);
+  const s = migrateState(state);
+  if (!s) return false;
+  if (s.year && FISCAL_CONFIG[s.year]) {
+    currentYear = parseInt(s.year, 10);
     const ys = $('year-selector');
     if (ys) ys.value = String(currentYear);
   }
-  if (state.transport) setTransport(state.transport, null);
-  if (state.repasType) setRepasType(state.repasType, null);
-  if (state.mutuelle) setMutuelle(state.mutuelle, null);
-  if (state.situation) { const s = $('situation'); if (s) s.value = state.situation; }
-  const f = state.f || {};
+  if (s.situation) { const el = $('situation'); if (el) el.value = s.situation; }
+  const np = $('nombre_parts');
+  if (np) np.value = s.nombreParts || '';
+  declarantCache = { d1: s.d1 || defaultDeclarant(), d2: s.d2 || defaultDeclarant() };
+  currentDeclarant = s.active === 'd2' ? 'd2' : 'd1';
+  loadDeclarant(currentDeclarant);
+  updateDeclarantUI();
+  updateYearDisplay();
+  calc();
+  return true;
+}
+
+// Charge un déclarant du cache dans le formulaire (champs + toggles)
+function loadDeclarant(key) {
+  const d = declarantCache[key] || defaultDeclarant();
+  declarantCache[key] = d;
+  setTransport(d.transport || 'voiture', null);
+  setRepasType(d.repasType || 'classique', null);
+  setMutuelle(d.mutuelle || 'entreprise_fiche', null);
+  const f = d.f || {};
   FIELD_IDS.forEach(id => {
-    if (id === 'situation') return;
     if (f[id] !== undefined) { const el = $(id); if (el) el.value = f[id]; }
   });
   CHECKBOX_IDS.forEach(id => {
     if (f[id] !== undefined) { const el = $(id); if (el) el.checked = (f[id] === 'on' || f[id] === true); }
   });
   syncForfaitTT();
-  updateYearDisplay();
+}
+
+function switchDeclarant(key) {
+  if (key !== 'd1' && key !== 'd2') return;
+  if (key !== currentDeclarant) {
+    captureDeclarant();
+    currentDeclarant = key;
+    loadDeclarant(key);
+  }
+  updateDeclarantUI();
   calc();
-  return true;
+}
+
+// Met à jour l'UI propre au mode déclarant (onglet actif, visibilité couple, étiquette de case)
+function updateDeclarantUI(res) {
+  const couple = !!(res && res.couple);
+  const wrap = $('declarant-toggle-wrap');
+  if (wrap) wrap.classList.toggle('hidden', !couple);
+  activateToggle('declarant-type', currentDeclarant);
+  const tag = $('salaire-case-tag');
+  if (tag) tag.textContent = currentDeclarant === 'd2' ? 'CASE 2AJ' : 'CASE 1AJ';
+  const cap = $('detail-caption');
+  if (cap) cap.textContent = currentDeclarant === 'd2'
+    ? 'Déclarant 2 — cases 2AJ / 1BK / 2GB-2JB / 6DE'
+    : 'Déclarant 1 — cases 1AJ / 1AK / 1GB-1JB / 6DD';
 }
 
 function defaultState() {
-  const f = {};
-  FIELD_IDS.forEach(id => { f[id] = ''; });
-  CHECKBOX_IDS.forEach(id => { f[id] = ''; });
-  return { year: currentYear, transport: 'voiture', repasType: 'classique', mutuelle: 'entreprise_fiche', situation: 'celibataire', f };
+  return {
+    year: currentYear,
+    situation: 'celibataire',
+    nombreParts: '',
+    active: 'd1',
+    d1: defaultDeclarant(),
+    d2: defaultDeclarant()
+  };
 }
 
 let saveTimer = null;
@@ -368,7 +448,7 @@ function fmtNumber(n, decimals = 0) {
 function calc() {
   const state = readState();
   const config = getConfig(currentYear);
-  const res = Calculs.compute(state, config);
+  const res = Calculs.computeFoyer(state, config);
   render(state, config, res);
   scheduleSave();
 }
@@ -407,44 +487,48 @@ function repasSub(res) {
 }
 
 function render(state, config, res) {
-  // Jours & km
-  $('res-jours').textContent = fmtNumber(res.jours.joursBureau);
-  $('res-jours-sub').textContent = `${res.jours.joursBureau} jours · ${res.jours.joursBureau * 2} trajets`;
+  // Le panneau détaille le déclarant actif ; revenu & impôt sont au niveau du foyer
+  const d = res.declarants[res.active] || res.declarants.d1;
+  updateDeclarantUI(res);
+
+  // Jours & km (déclarant actif)
+  $('res-jours').textContent = fmtNumber(d.jours.joursBureau);
+  $('res-jours-sub').textContent = `${d.jours.joursBureau} jours · ${d.jours.joursBureau * 2} trajets`;
   const kmEl = $('km_annuel');
-  if (kmEl) kmEl.value = res.kmAnnuel ? Math.round(res.kmAnnuel) : '';
-  $('res-km-annuel').textContent = fmtNumber(res.kmAnnuel);
-  $('res-km-sub').textContent = res.transport.detail.depassement40km
+  if (kmEl) kmEl.value = d.kmAnnuel ? Math.round(d.kmAnnuel) : '';
+  $('res-km-annuel').textContent = fmtNumber(d.kmAnnuel);
+  $('res-km-sub').textContent = d.transport.detail.depassement40km
     ? `limité à ${config.limiteKmTrajet} km aller × 2 × jours`
     : 'jours au bureau × distance aller × 2';
 
-  // Frais
-  $('res-transport').textContent = fmt(res.transport.frais);
-  $('res-transport-sub').textContent = transportSub(config, res);
-  $('res-repas').textContent = fmt(res.repas.deductible);
-  $('res-repas-sub').textContent = repasSub(res);
-  $('res-autres').textContent = fmt(res.autresFrais.total);
-  const postesActifs = (res.autresFrais.postes || []).filter(p => p.montant > 0);
+  // Frais (déclarant actif)
+  $('res-transport').textContent = fmt(d.transport.frais);
+  $('res-transport-sub').textContent = transportSub(config, d);
+  $('res-repas').textContent = fmt(d.repas.deductible);
+  $('res-repas-sub').textContent = repasSub(d);
+  $('res-autres').textContent = fmt(d.autresFrais.total);
+  const postesActifs = (d.autresFrais.postes || []).filter(p => p.montant > 0);
   const detailPostes = postesActifs.map(p => `${p.court} ${fmt(p.montant)}`).join(' · ');
   let subAutres = '';
-  if (res.autresFrais.forfaitTT !== null) subAutres += `forfait télétravail ${fmt(res.autresFrais.forfaitTT)}`;
+  if (d.autresFrais.forfaitTT !== null) subAutres += `forfait télétravail ${fmt(d.autresFrais.forfaitTT)}`;
   if (detailPostes) subAutres += (subAutres ? ' · ' : '') + detailPostes;
   $('res-autres-sub').textContent = subAutres || 'Télétravail, formation, documentation, autres';
 
-  // Revenu & impôt
+  // Revenu & impôt (foyer)
   $('res-revenu-net').textContent = fmt(res.revenuNetImposable);
   $('res-impot-brut').textContent = fmt(res.impot.impotBrut);
   $('res-impot-brut-sub').textContent = `Barème ${currentYear} · ${fmtNumber(res.impot.nombreParts, 1)} part(s) · TMI ${res.impot.tranche}`;
   $('res-impot-net').textContent = fmt(res.impot.impotNet);
   $('res-impot-net-sub').textContent = `après décote ${fmt(res.impot.decote)}${res.impot.cehr > 0 ? ' + CEHR ' + fmt(res.impot.cehr) : ''} (estimation)`;
 
-  // Détails
-  $('d-total-brut').textContent = fmt(res.totalFraisBruts);
-  $('d-remb').textContent = fmt(-res.remboursements.total);
-  $('d-total-net').textContent = fmt(res.totalFraisNets);
-  $('d-abattement').textContent = fmt(res.abattement10Pct);
+  // Détails (déclarant actif)
+  $('d-total-brut').textContent = fmt(d.totalFraisBruts);
+  $('d-remb').textContent = fmt(-d.remboursements.total);
+  $('d-total-net').textContent = fmt(d.totalFraisNets);
+  $('d-abattement').textContent = fmt(d.abattement10Pct);
   const gainEl = $('d-gain');
-  gainEl.textContent = fmt(res.gain);
-  gainEl.style.color = res.gain >= 0 ? 'var(--accent2)' : '#ff9a62';
+  gainEl.textContent = fmt(d.gain);
+  gainEl.style.color = d.gain >= 0 ? 'var(--accent2)' : '#ff9a62';
   $('d-revenu-par-part').textContent = fmt(res.impot.revenuParPart);
   $('d-tranche').textContent = res.impot.tranche;
   $('d-decote').textContent = res.impot.decote > 0 ? fmt(-res.impot.decote) : fmt(0);
@@ -452,27 +536,60 @@ function render(state, config, res) {
   if (cehrRow) cehrRow.style.display = res.impot.cehr > 0 ? 'flex' : 'none';
   $('d-cehr').textContent = fmt(res.impot.cehr);
 
-  // Mutuelle
+  // Mutuelle (déclarant actif)
   const dMut = $('d-mutuelle');
-  if (res.mutuelle.deductible > 0) {
+  if (d.mutuelle.deductible > 0) {
     dMut.style.display = 'flex';
-    $('d-mutuelle-label').textContent = `Mutuelle déductible (case ${res.mutuelle.case} · ${res.mutuelle.formulaire})`;
-    $('d-mutuelle-val').textContent = fmt(res.mutuelle.deductible);
+    $('d-mutuelle-label').textContent = `Mutuelle déductible (case ${d.cases.mutuelle} · ${d.mutuelle.formulaire})`;
+    $('d-mutuelle-val').textContent = fmt(d.mutuelle.deductible);
   } else {
     dMut.style.display = 'none';
   }
 
+  // Comparaison déclarant 1 / déclarant 2 (couple uniquement)
+  renderCompare(res);
+
   // Avertissements
   renderWarnings(res.warnings);
 
-  // Verdict
-  const v = res.verdict;
+  // Verdict (déclarant actif + synthèse foyer si couple)
+  const v = d.verdict;
   const box = $('verdict-box');
   box.className = `verdict ${v.kind}`;
   const icon = v.kind === 'good' ? ICON_OK : v.kind === 'bad' ? ICON_WARN : ICON_INFO;
-  box.innerHTML = `<div class="verdict-icon">${icon}</div><div class="verdict-text"><strong></strong><br><span></span></div>`;
+  box.innerHTML = `<div class="verdict-icon">${icon}</div><div class="verdict-text"><strong></strong><br><span></span><span class="verdict-foyer" style="display:none;"></span></div>`;
   box.querySelector('strong').textContent = v.title;
   box.querySelector('.verdict-text span').textContent = v.text;
+  const foyerEl = box.querySelector('.verdict-foyer');
+  if (res.couple && foyerEl) {
+    foyerEl.style.display = 'block';
+    foyerEl.textContent = `Foyer (imposition commune) : ${res.verdict.title} — ${res.verdict.text}`;
+  }
+}
+
+// Tableau comparatif déclarant 1 / déclarant 2 + total foyer (visible en couple uniquement)
+function renderCompare(res) {
+  const t = $('compare-table');
+  if (!t) return;
+  if (!res.couple) { t.classList.add('hidden'); return; }
+  t.classList.remove('hidden');
+  const d1 = res.declarants.d1, d2 = res.declarants.d2;
+  const set = (id, v) => { const el = $(id); if (el) el.textContent = v; };
+  set('cmp-salaire-1', fmt(d1.salaire));
+  set('cmp-salaire-2', fmt(d2.salaire));
+  set('cmp-bruts-1', fmt(d1.totalFraisBruts));
+  set('cmp-bruts-2', fmt(d2.totalFraisBruts));
+  set('cmp-remb-1', fmt(-d1.remboursements.total));
+  set('cmp-remb-2', fmt(-d2.remboursements.total));
+  set('cmp-nets-1', fmt(d1.totalFraisNets));
+  set('cmp-nets-2', fmt(d2.totalFraisNets));
+  set('cmp-abat-1', fmt(d1.abattement10Pct));
+  set('cmp-abat-2', fmt(d2.abattement10Pct));
+  set('cmp-ded-1', fmt(d1.deductionRetenue));
+  set('cmp-ded-2', fmt(d2.deductionRetenue));
+  set('cmp-verdict-1', d1.salaire === 0 ? '—' : (d1.gain > 0 ? 'frais réels' : 'forfait 10 %'));
+  set('cmp-verdict-2', d2.salaire === 0 ? '—' : (d2.gain > 0 ? 'frais réels' : 'forfait 10 %'));
+  set('cmp-foyer-val', `RNI foyer ${fmt(res.revenuNetImposable)} · gain vs 10 % ${fmt(res.gainFoyer)} · ${fmtNumber(res.nombreParts, 1)} part(s)`);
 }
 
 function renderWarnings(warnings) {
@@ -515,7 +632,22 @@ function download(blob, filename) {
 function buildExportData() {
   const state = readState();
   const config = getConfig(currentYear);
-  const res = Calculs.compute(state, config);
+  const res = Calculs.computeFoyer(state, config);
+  const d = res.declarants[res.active] || res.declarants.d1;
+  const exportDeclarant = (dd) => ({
+    label: dd.label,
+    cases: dd.cases,
+    salaire: dd.salaire,
+    totalFraisBruts: dd.totalFraisBruts,
+    totalFraisNets: dd.totalFraisNets,
+    remboursements: dd.remboursements.total,
+    abattement10Pct: dd.abattement10Pct,
+    deductionRetenue: dd.deductionRetenue,
+    deduction6DD: dd.deduction6DD,
+    gain: dd.gain,
+    verdict: `${dd.verdict.title} — ${dd.verdict.text}`,
+    declaration: dd.declaration
+  });
   return {
     metadata: {
       calculator: `Calculateur Frais Réels v${VERSION}`,
@@ -531,26 +663,17 @@ function buildExportData() {
       ]
     },
     state, // réimportable via le bouton « Importer JSON »
-    situation: {
-      salaireNetImposable: res.salaire,
-      nombreParts: res.impot.nombreParts,
+    foyer: {
+      couple: res.couple,
       situationFamiliale: res.situation,
-      joursOuvres: res.jours.joursOuvres,
-      joursArret: res.jours.joursArret,
-      joursTeletravail: res.jours.joursTeletravail,
-      joursBureau: res.jours.joursBureau
-    },
-    transport: { ...res.transport.detail, fraisTransport: res.transport.frais },
-    repas: res.repas,
-    autresFrais: res.autresFrais,
-    remboursements: res.remboursements,
-    mutuelle: res.mutuelle,
-    results: {
-      totalFraisBruts: res.totalFraisBruts,
-      totalFraisNets: res.totalFraisNets,
-      abattement10Pct: res.abattement10Pct,
-      deductionRetenue: res.deductionRetenue,
-      gain: res.gain,
+      nombreParts: res.nombreParts,
+      salaireFoyer: res.salaireFoyer,
+      totalFraisBrutsFoyer: res.fraisBrutsFoyer,
+      totalFraisNetsFoyer: res.fraisNetsFoyer,
+      abattement10PctFoyer: res.abattementFoyer,
+      deductionRetenueFoyer: res.deductionFraisFoyer,
+      deduction6DDFoyer: res.deduction6DDFoyer,
+      gainFoyer: res.gainFoyer,
       revenuNetImposable: res.revenuNetImposable,
       revenuParPart: res.impot.revenuParPart,
       tranche: res.impot.tranche,
@@ -560,14 +683,48 @@ function buildExportData() {
       impotNetEstime: res.impot.impotNet,
       verdict: `${res.verdict.title} — ${res.verdict.text}`
     },
+    declarants: {
+      d1: exportDeclarant(res.declarants.d1),
+      d2: res.couple ? exportDeclarant(res.declarants.d2) : null
+    },
+    situation: {
+      salaireNetImposable: d.salaire,
+      nombreParts: res.nombreParts,
+      situationFamiliale: res.situation,
+      joursOuvres: d.jours.joursOuvres,
+      joursArret: d.jours.joursArret,
+      joursTeletravail: d.jours.joursTeletravail,
+      joursBureau: d.jours.joursBureau
+    },
+    transport: { ...d.transport.detail, fraisTransport: d.transport.frais },
+    repas: d.repas,
+    autresFrais: d.autresFrais,
+    remboursements: d.remboursements,
+    mutuelle: d.mutuelle,
+    results: {
+      totalFraisBruts: d.totalFraisBruts,
+      totalFraisNets: d.totalFraisNets,
+      abattement10Pct: d.abattement10Pct,
+      deductionRetenue: d.deductionRetenue,
+      gain: d.gain,
+      revenuNetImposable: res.revenuNetImposable,
+      revenuParPart: res.impot.revenuParPart,
+      tranche: res.impot.tranche,
+      impotBrut: res.impot.impotBrut,
+      decote: res.impot.decote,
+      cehr: res.impot.cehr,
+      impotNetEstime: res.impot.impotNet,
+      verdict: `${d.verdict.title} — ${d.verdict.text}`
+    },
     warnings: res.warnings.map(w => w.text),
     declaration: {
-      case1AK_totalFraisReels: fmt(res.declaration.case1AK),
-      detailTransport: fmt(res.declaration.detailTransport),
-      detailRepas: fmt(res.declaration.detailRepas),
-      detailAutres: fmt(res.declaration.detailAutres),
-      remboursementsReintegres: fmt(res.declaration.remboursementsReintegres),
-      mutuelle: res.declaration.mutuelleCase ? `${res.declaration.mutuelleCase} : ${fmt(res.declaration.mutuelleMontant)}` : res.mutuelle.info
+      case1AK_totalFraisReels: fmt(d.declaration.caseAK),
+      detailTransport: fmt(d.declaration.detailTransport),
+      detailRepas: fmt(d.declaration.detailRepas),
+      detailAutres: fmt(d.declaration.detailAutres),
+      remboursementsReintegres: fmt(d.declaration.remboursementsReintegres),
+      mutuelle: d.declaration.mutuelleCase ? `${d.declaration.mutuelleCase} : ${fmt(d.declaration.mutuelleMontant)}` : d.mutuelle.info,
+      foyer: res.declaration
     }
   };
 }
@@ -617,6 +774,23 @@ function exportCSV(data) {
     ['Déclaration', 'Détail autres frais', data.declaration.detailAutres, '', ''],
     ['Déclaration', 'Remboursements à réintégrer (1GB-1JB)', data.declaration.remboursementsReintegres, '', '1GB-1JB'],
     ['Déclaration', 'Mutuelle', data.declaration.mutuelle, '', ''],
+    ...(data.foyer.couple ? [
+      ['', '', '', '', ''],
+      ['Foyer', 'Couple — imposition commune', '', '', ''],
+      ['Foyer', 'Salaire net imposable déclarant 1', data.declarants.d1.salaire, '€', '1AJ'],
+      ['Foyer', 'Salaire net imposable déclarant 2', data.declarants.d2.salaire, '€', '2AJ'],
+      ['Foyer', 'Total frais réels bruts déclarant 1', data.declarants.d1.totalFraisBruts, '€', '1AK'],
+      ['Foyer', 'Total frais réels bruts déclarant 2', data.declarants.d2.totalFraisBruts, '€', '1BK'],
+      ['Foyer', 'Remboursements à réintégrer déclarant 1', data.declarants.d1.remboursements, '€', '1GB-1JB'],
+      ['Foyer', 'Remboursements à réintégrer déclarant 2', data.declarants.d2.remboursements, '€', '2GB-2JB'],
+      ['Foyer', 'Mutuelle déductible d1 / d2', `${data.declarants.d1.deduction6DD} / ${data.declarants.d2.deduction6DD}`, '€', '6DD-6DE'],
+      ['Foyer', 'Abattement 10 % total (min/max PAR DÉCLARANT)', data.foyer.abattement10PctFoyer, '€', ''],
+      ['Foyer', 'Déduction retenue totale (choix par déclarant)', data.foyer.deductionRetenueFoyer, '€', ''],
+      ['Foyer', 'Gain frais réels vs 10 % au niveau du foyer', data.foyer.gainFoyer, '€', ''],
+      ['Foyer', 'Revenu net imposable du foyer', data.foyer.revenuNetImposable, '€', ''],
+      ['Foyer', 'Impôt net estimé du foyer', data.foyer.impotNetEstime, '€', ''],
+      ['Foyer', 'Verdict foyer', data.foyer.verdict, '', '']
+    ] : []),
     ['', '', '', '', ''],
     ['Conseil', data.results.verdict, '', '', '']
   ];
@@ -686,6 +860,22 @@ function exportTXT(data) {
     `   détail : transport ${d.detailTransport} · repas ${d.detailRepas} · autres ${d.detailAutres}`,
     `Remboursements à réintégrer (cases 1GB-1JB) : ${d.remboursementsReintegres}`,
     `Mutuelle : ${d.mutuelle}`,
+    ...(data.foyer.couple ? [
+      '',
+      '--- FOYER (IMPOSITION COMMUNE) ---',
+      `Salaire net imposable déclarant 1 (1AJ) : ${fmt(data.declarants.d1.salaire)}`,
+      `Salaire net imposable déclarant 2 (2AJ) : ${fmt(data.declarants.d2.salaire)}`,
+      `Total frais réels bruts — 1AK (déclarant 1) : ${fmt(data.declarants.d1.totalFraisBruts)}`,
+      `Total frais réels bruts — 1BK (déclarant 2) : ${fmt(data.declarants.d2.totalFraisBruts)}`,
+      `Remboursements à réintégrer — 1GB-1JB (d1) : ${fmt(data.declarants.d1.remboursements)} · 2GB-2JB (d2) : ${fmt(data.declarants.d2.remboursements)}`,
+      `Mutuelle — 6DD (d1) : ${fmt(data.declarants.d1.deduction6DD)} · 6DE (d2) : ${fmt(data.declarants.d2.deduction6DD)}`,
+      `Abattement 10 % total (min 509 € / max 14 555 € PAR DÉCLARANT) : ${fmt(data.foyer.abattement10PctFoyer)}`,
+      `Déduction retenue totale (max(frais nets, 10 %) par déclarant) : ${fmt(data.foyer.deductionRetenueFoyer)}`,
+      `Gain frais réels vs 10 % au niveau du foyer : ${fmt(data.foyer.gainFoyer)}`,
+      `Revenu net imposable du foyer : ${fmt(data.foyer.revenuNetImposable)} (${fmtNumber(data.foyer.nombreParts, 1)} parts)`,
+      `Impôt net estimé du foyer : ${fmt(data.foyer.impotNetEstime)} (décote ${fmt(data.foyer.decote)}${data.foyer.cehr > 0 ? ' + CEHR ' + fmt(data.foyer.cehr) : ''})`,
+      `Verdict foyer : ${data.foyer.verdict}`
+    ] : []),
     '',
     '--- CONSEIL ---',
     res.verdict,

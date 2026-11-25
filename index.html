@@ -291,6 +291,11 @@
   .detail-table { border-top: 1px solid var(--panel-line); margin-top: 20px; padding-top: 6px; font-size: 13px; }
   .detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; color: var(--panel-text); border-bottom: 1px solid var(--panel-line); }
   .detail-row:last-child { border-bottom: none; }
+  .detail-caption { margin-top: 18px; font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--amber); letter-spacing: 0.4px; }
+  .cmp-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 8px 0; color: var(--panel-text); border-bottom: 1px solid var(--panel-line); font-size: 13px; }
+  .cmp-row:last-child { border-bottom: none; }
+  .cmp-head { font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--panel-strong); }
+  .verdict-foyer { display: block; margin-top: 6px; font-size: 12px; opacity: 0.85; }
   .detail-label { color: var(--panel-mute); }
   .detail-value { font-family: var(--font-mono); font-size: 13px; font-weight: 500; text-align: right; color: var(--panel-strong); }
   .detail-value.neg { color: var(--bad-text); }
@@ -412,9 +417,19 @@
         <div class="card-toggle open" id="toggle-fiscal"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></div>
       </button>
       <div class="card-body open" id="body-fiscal">
+        <div class="field span2 hidden" id="declarant-toggle-wrap">
+          <label id="label-declarant">Déclarant édité</label>
+          <div class="toggle-group mt8" id="declarant-type" role="group" aria-labelledby="label-declarant">
+            <button type="button" class="toggle-btn active" data-type="d1">Déclarant 1 · 1AJ / 1AK</button>
+            <button type="button" class="toggle-btn" data-type="d2">Déclarant 2 · 2AJ / 1BK</button>
+          </div>
+          <div class="info-box" style="margin-top:10px;">
+            En couple (marié·e / pacsé·e — imposition commune), chaque déclarant a son propre salaire (1AJ / 2AJ), ses propres frais réels (1AK / 1BK, remboursements 1GB-1JB / 2GB-2JB, mutuelle 6DD / 6DE) et son propre abattement de 10 % (min 509 € / max 14 555 € chacun). L'impôt est calculé sur le revenu global du foyer.
+          </div>
+        </div>
         <div class="form-grid">
           <div class="field">
-            <label for="salaire">Salaire net imposable annuel (€) <span class="case-tag">CASE 1AJ</span><span class="label-hint">fiche de paie, après cotisations sociales</span></label>
+            <label for="salaire">Salaire net imposable annuel (€) <span class="case-tag" id="salaire-case-tag">CASE 1AJ</span><span class="label-hint">fiche de paie, après cotisations sociales</span></label>
             <input type="number" id="salaire" placeholder="ex : 42 000" inputmode="decimal">
           </div>
           <div class="field">
@@ -919,6 +934,7 @@
           </div>
         </div>
 
+        <div class="detail-caption" id="detail-caption">Déclarant 1 — cases 1AJ / 1AK / 1GB-1JB / 6DD</div>
         <div class="detail-table" id="detail-table">
           <div class="detail-row">
             <span class="detail-label">Total frais réels bruts</span>
@@ -960,6 +976,18 @@
             <span class="detail-label">CEHR (hauts revenus)</span>
             <span class="detail-value" id="d-cehr">—</span>
           </div>
+        </div>
+
+        <div class="detail-table hidden" id="compare-table" aria-label="Comparaison déclarant 1 et déclarant 2">
+          <div class="cmp-row cmp-head"><span class="detail-label"></span><span class="detail-value">D1 · 1AJ / 1AK</span><span class="detail-value">D2 · 2AJ / 1BK</span></div>
+          <div class="cmp-row"><span class="detail-label">Salaire net imposable</span><span class="detail-value" id="cmp-salaire-1">—</span><span class="detail-value" id="cmp-salaire-2">—</span></div>
+          <div class="cmp-row"><span class="detail-label">Frais réels bruts</span><span class="detail-value" id="cmp-bruts-1">—</span><span class="detail-value" id="cmp-bruts-2">—</span></div>
+          <div class="cmp-row"><span class="detail-label">− Remboursements</span><span class="detail-value neg" id="cmp-remb-1">—</span><span class="detail-value neg" id="cmp-remb-2">—</span></div>
+          <div class="cmp-row"><span class="detail-label">Frais réels nets</span><span class="detail-value" id="cmp-nets-1">—</span><span class="detail-value" id="cmp-nets-2">—</span></div>
+          <div class="cmp-row"><span class="detail-label">Abattement 10 %</span><span class="detail-value" id="cmp-abat-1">—</span><span class="detail-value" id="cmp-abat-2">—</span></div>
+          <div class="cmp-row"><span class="detail-label">Déduction retenue</span><span class="detail-value total" id="cmp-ded-1">—</span><span class="detail-value total" id="cmp-ded-2">—</span></div>
+          <div class="cmp-row"><span class="detail-label">Option retenue</span><span class="detail-value" id="cmp-verdict-1">—</span><span class="detail-value" id="cmp-verdict-2">—</span></div>
+          <div class="cmp-row cmp-head"><span class="detail-label">Foyer (imposition commune)</span><span class="detail-value" id="cmp-foyer-val">—</span><span></span></div>
         </div>
 
         <div class="warnings" id="warnings" aria-live="polite">
