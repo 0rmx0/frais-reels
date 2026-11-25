@@ -37,6 +37,8 @@ Sélectionne « Marié·e / pacsé·e » dans la section 01 : l'onglet **« Déc
 
 ## Développement
 
+Règles du projet pour agents et contributeurs (intransigeance requise sur la **justesse des calculs** et la **conformité aux textes de loi**, architecture, commandes, conventions) : voir [AGENTS.md](AGENTS.md).
+
 ```bash
 node --check config.js calculs.js app.js sw.js   # vérification syntaxique
 node --test                                       # tests unitaires + smoke test (node:test)
