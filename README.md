@@ -14,6 +14,7 @@ Simulateur **100 % client-side** pour comparer les **frais réels** et l'**abatt
 - **Remboursements employeur** soustraits (seul le net est déductible), avec alerte si IK > barème fiscal.
 - **Mutuelle** : entreprise (fiche de paie / case 6DD), Madelin (TNS), individuelle (non déductible).
 - **Impôt** : barème progressif par part, **plafonnement du quotient familial**, **décote**, **CEHR** (mention de la **CDHR** au-delà des seuils) → impôt brut *et* impôt net estimé.
+- **Couple / deux déclarants** : onglets Déclarant 1 / Déclarant 2 (salaires **1AJ/2AJ**, frais réels **1AK/1BK**, remboursements **1GB-1JB/2GB-2JB**, mutuelle **6DD/6DE**), **abattement 10 % par déclarant** (min 509 € / max 14 555 € chacun), choix forfait vs frais réels individuel, impôt sur le **revenu global du foyer** et comparaison côte à côte dans le panneau Résultat.
 - **Années** : barèmes 2026 (officiels) et 2027 (provisoires, publiés au printemps 2027).
 - **Avertissements contextuels** (40 km, plafonds dépassés, IK excédentaires…).
 - **Vie privée** : aucune donnée ne quitte ton navigateur. Sauvegarde automatique en `localStorage`, **lien partageable** (`?s=…`, données en clair dans l'URL — à ne transmettre qu'à soi-même), export/import JSON, exports **TXT / JSON / CSV**, impression de la fiche récapitulative.
@@ -30,6 +31,10 @@ python3 -m http.server 8000
 
 Aucune dépendance, aucun build : HTML + CSS + JavaScript vanilla.
 
+### En couple (imposition commune)
+
+Sélectionne « Marié·e / pacsé·e » dans la section 01 : l'onglet **« Déclarant édité »** permet de remplir chaque conjoint (son salaire → 1AJ/2AJ, ses frais → 1AK/1BK). L'abattement de 10 % s'applique **par déclarant** (min 509 € / max 14 555 € chacun, aucun abattement sans revenu) : chacun choisit individuellement frais réels ou forfait. L'impôt est estimé sur le revenu global du foyer (quotient familial, décote couple, CEHR couple) et les exports TXT/CSV/JSON listent toutes les cases par déclarant.
+
 ## Développement
 
 ```bash
@@ -42,7 +47,7 @@ node --test                                       # tests unitaires + smoke test
 | Fichier | Rôle |
 |---|---|
 | `config.js` | Barèmes fiscaux par année (source de vérité), exportable en Node |
-| `calculs.js` | Module de calcul **pur** (sans DOM) : `Calculs.compute(state, config)` |
+| `calculs.js` | Module de calcul **pur** (sans DOM) : `Calculs.computeFoyer(state, config)` (foyer à 1 ou 2 déclarants) et `Calculs.compute(state, config)` (API historique, un seul déclarant) |
 | `app.js` | Couche DOM : état, rendu, exports, partage, service worker |
 | `index.html` | Page + styles (clair/sombre/impression) |
 | `tests/` | Tests `node:test` (calculs + smoke test DOM stub) |
@@ -59,7 +64,7 @@ node --test                                       # tests unitaires + smoke test
 
 ## Feuille de route
 
-- Comparaison côte à côte (déclarant 1 vs 2, ou année 2026 vs 2027)
+- Comparaison côte à côte année 2026 vs 2027 (déclarant 1 vs 2 : fait en 2.3.0)
 - Import CSV d'un relevé de tickets restaurant
 - Graphiques SVG (répartition des frais, courbe impôt/revenu)
 - Historique des barèmes 2024–2025

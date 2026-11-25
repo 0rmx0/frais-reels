@@ -1,5 +1,5 @@
 // Service worker — calculateur 100 % statique : cache-first sur les assets same-origin.
-const CACHE = 'frais-reels-v2.2.0';
+const CACHE = 'frais-reels-v2.3.0';
 const ASSETS = ['./', 'index.html', 'app.js', 'calculs.js', 'config.js', 'icon.svg', 'manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {

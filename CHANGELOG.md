@@ -3,6 +3,20 @@
 Toutes les évolutions notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le versionnage sémantique.
 
+## [2.3.0] — 2026-11-25
+
+### Ajouté
+- **Mode couple à deux déclarants** (imposition commune) : onglets « Déclarant 1 / Déclarant 2 » dans la section Situation fiscale, visibles quand « Marié·e / pacsé·e » est sélectionné. Chaque déclarant a son propre salaire (cases **1AJ / 2AJ**), ses propres frais réels (totaux en **1AK / 1BK**), ses remboursements (**1GB-1JB / 2GB-2JB**) et sa mutuelle (**6DD / 6DE**).
+- **Abattement de 10 % calculé par déclarant** (min 509 € / max 14 555 € chacun, aucun abattement sans revenu) : le choix frais réels vs forfait se fait individuellement, déclarant par déclarant. Corrige le biais où saisir le salaire cumulé du couple comparait les frais à un seul plafond de 14 555 €.
+- **Impôt au niveau du foyer** : calcul sur le revenu global (1AJ + 2AJ − déductions retenues − 6DD/6DE) avec quotient familial, décote couple et seuils CEHR couple.
+- **Tableau comparatif Déclarant 1 / Déclarant 2** dans le panneau Résultat (salaire, frais bruts/nets, abattement 10 %, déduction retenue, option retenue) + ligne de synthèse foyer ; avertissements préfixés « Déclarant 1/2 » ; étiquette de case salaire dynamique (1AJ / 2AJ).
+- **Exports TXT / CSV / JSON** : section « FOYER (imposition commune) » en couple avec toutes les cases par déclarant, le RNI et l'impôt net estimé du foyer.
+- **Migration transparente** des états enregistrés (localStorage) et des liens de partage `?s=` de l'ancien format à un seul déclarant vers le nouveau format à deux déclarants.
+
+### Corrigé
+- Abattement de 10 % affiché à 509 € même sans salaire saisi : désormais 0 € sans revenu (sans effet sur le RNI, déjà borné à 0).
+- Nombre de parts par défaut en situation « couple » avec champ vide : 2 parts (base du couple) au lieu de 1.
+
 ## [2.2.0] — 2026-11-25
 
 ### Refonte graphique
