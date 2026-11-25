@@ -9,7 +9,7 @@
 <meta property="og:description" content="Frais réels vs abattement 10 % : transport (barème kilométrique officiel), repas, tickets restaurant, télétravail, mutuelle. Aucune donnée envoyée.">
 <meta property="og:type" content="website">
 <meta name="theme-color" content="#0f2040">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'; manifest-src 'self'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' blob: data:; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src https://fonts.bunny.net; img-src 'self' data:; connect-src 'self' https://fonts.bunny.net; manifest-src 'self'">
 <link rel="icon" type="image/svg+xml" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <link rel="manifest" href="manifest.webmanifest">
@@ -196,7 +196,7 @@
 
     <!-- SECTION 1 : SITUATION FISCALE -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-fiscal" onclick="toggleCard('fiscal')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-fiscal">
         <div class="card-icon">📊</div>
         <div class="card-title">Situation fiscale</div>
         <div class="card-toggle open" id="toggle-fiscal">▾</div>
@@ -227,7 +227,7 @@
 
     <!-- SECTION 2 : EMPLOI -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-emploi" onclick="toggleCard('emploi')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-emploi">
         <div class="card-icon">💼</div>
         <div class="card-title">Emploi &amp; présence</div>
         <div class="card-toggle open" id="toggle-emploi">▾</div>
@@ -255,7 +255,7 @@
 
     <!-- SECTION 3 : TRANSPORT -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-transport" onclick="toggleCard('transport')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-transport">
         <div class="card-icon">🚗</div>
         <div class="card-title">Transport domicile ↔ travail</div>
         <div class="card-toggle open" id="toggle-transport">▾</div>
@@ -265,11 +265,11 @@
           <div class="field">
             <label id="label-transport">Moyen de transport principal</label>
             <div class="toggle-group mt8" id="transport-type" role="group" aria-labelledby="label-transport">
-              <button type="button" class="toggle-btn active" data-type="voiture" onclick="setTransport('voiture', this)">🚗 Voiture</button>
-              <button type="button" class="toggle-btn" data-type="moto" onclick="setTransport('moto', this)">🛵 Moto</button>
-              <button type="button" class="toggle-btn" data-type="cyclomoteur" onclick="setTransport('cyclomoteur', this)">🛴 Cyclo</button>
-              <button type="button" class="toggle-btn" data-type="tc" onclick="setTransport('tc', this)">🚇 Transports</button>
-              <button type="button" class="toggle-btn" data-type="velo" onclick="setTransport('velo', this)">🚲 Vélo</button>
+              <button type="button" class="toggle-btn active" data-type="voiture">🚗 Voiture</button>
+              <button type="button" class="toggle-btn" data-type="moto">🛵 Moto</button>
+              <button type="button" class="toggle-btn" data-type="cyclomoteur">🛴 Cyclo</button>
+              <button type="button" class="toggle-btn" data-type="tc">🚇 Transports</button>
+              <button type="button" class="toggle-btn" data-type="velo">🚲 Vélo</button>
             </div>
           </div>
         </div>
@@ -354,7 +354,7 @@
 
     <!-- SECTION 4 : REPAS -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-repas" onclick="toggleCard('repas')">
+      <button type="button" class="card-header" aria-expanded="true" aria-controls="body-repas">
         <div class="card-icon">🍽️</div>
         <div class="card-title">Frais de repas</div>
         <div class="card-toggle open" id="toggle-repas">▾</div>
@@ -364,9 +364,9 @@
           <div class="field">
             <label id="label-repas">Type de frais de repas</label>
             <div class="toggle-group mt8" id="repas-type" role="group" aria-labelledby="label-repas">
-              <button type="button" class="toggle-btn active" data-type="classique" onclick="setRepasType('classique', this)">🍽️ Repas classiques</button>
-              <button type="button" class="toggle-btn" data-type="tickets" onclick="setRepasType('tickets', this)">🎫 Tickets restaurant</button>
-              <button type="button" class="toggle-btn" data-type="mixte" onclick="setRepasType('mixte', this)">🍽️+🎫 Mixte</button>
+              <button type="button" class="toggle-btn active" data-type="classique">🍽️ Repas classiques</button>
+              <button type="button" class="toggle-btn" data-type="tickets">🎫 Tickets restaurant</button>
+              <button type="button" class="toggle-btn" data-type="mixte">🍽️+🎫 Mixte</button>
             </div>
           </div>
         </div>
@@ -447,7 +447,7 @@
 
     <!-- SECTION 5 : AUTRES FRAIS -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-autres" onclick="toggleCard('autres')">
+      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-autres">
         <div class="card-icon">💳</div>
         <div class="card-title">Autres frais professionnels</div>
         <div class="card-toggle" id="toggle-autres">▾</div>
@@ -486,7 +486,7 @@
 
     <!-- SECTION 6 : REMBOURSEMENTS -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-remb" onclick="toggleCard('remb')">
+      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-remb">
         <div class="card-icon">💰</div>
         <div class="card-title">Remboursements employeur</div>
         <div class="card-toggle" id="toggle-remb">▾</div>
@@ -518,7 +518,7 @@
 
     <!-- SECTION 7 : MUTUELLE -->
     <div class="card">
-      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-mutuelle" onclick="toggleCard('mutuelle')">
+      <button type="button" class="card-header" aria-expanded="false" aria-controls="body-mutuelle">
         <div class="card-icon">🏥</div>
         <div class="card-title">Mutuelle santé</div>
         <div class="card-toggle" id="toggle-mutuelle">▾</div>
@@ -528,10 +528,10 @@
           <div class="field">
             <label id="label-mutuelle">Type de mutuelle</label>
             <div class="toggle-group mt8" id="mutuelle-type" role="group" aria-labelledby="label-mutuelle">
-              <button type="button" class="toggle-btn active" data-type="entreprise_fiche" onclick="setMutuelle('entreprise_fiche', this)">🏢 Entreprise (fiche de paie)</button>
-              <button type="button" class="toggle-btn" data-type="entreprise_6dd" onclick="setMutuelle('entreprise_6dd', this)">📋 Entreprise (non déduite)</button>
-              <button type="button" class="toggle-btn" data-type="madelin" onclick="setMutuelle('madelin', this)">💼 TNS / Madelin</button>
-              <button type="button" class="toggle-btn" data-type="individuelle" onclick="setMutuelle('individuelle', this)">👤 Individuelle</button>
+              <button type="button" class="toggle-btn active" data-type="entreprise_fiche">🏢 Entreprise (fiche de paie)</button>
+              <button type="button" class="toggle-btn" data-type="entreprise_6dd">📋 Entreprise (non déduite)</button>
+              <button type="button" class="toggle-btn" data-type="madelin">💼 TNS / Madelin</button>
+              <button type="button" class="toggle-btn" data-type="individuelle">👤 Individuelle</button>
             </div>
           </div>
         </div>
@@ -678,17 +678,17 @@
 
         <div class="export-section">
           <div class="export-dropdown">
-            <button type="button" class="export-dropdown-btn btn" onclick="showExportMenu()">📄 Exporter pour la déclaration</button>
+            <button type="button" class="export-dropdown-btn btn">📄 Exporter pour la déclaration</button>
             <div class="export-menu" id="export-menu">
-              <button type="button" class="export-btn" onclick="exportCalculs('txt'); showExportMenu();">
+              <button type="button" class="export-btn" data-format="txt">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/></svg>
                 TXT (déclaration complète)
               </button>
-              <button type="button" class="export-btn" onclick="exportCalculs('json'); showExportMenu();">
+              <button type="button" class="export-btn" data-format="json">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M12,4A8,8 0 0,1 20,12A8,8 0 0,1 12,20A8,8 0 0,1 4,12A8,8 0 0,1 12,4Z"/></svg>
                 JSON (données structurées + état réimportable)
               </button>
-              <button type="button" class="export-btn" onclick="exportCalculs('csv'); showExportMenu();">
+              <button type="button" class="export-btn" data-format="csv">
                 <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17,4H19V0H15V2H17M13,4H15V0H9V2H13M9,4H11V0H7V2H9M19,8H22V6H19M17,8H19V6H15V8H17M13,8H15V6H9V8H13M9,8H11V6H7V8H9M21,12H24V10H21M19,12H21V10H17V12H19M15,12H17V10H13V12H15M11,12H13V10H9V12H11M7,12H9V10H5V12H7M22,16H24V14H22M20,16H22V14H18V16H20M16,16H18V14H14V16H16M12,16H14V14H10V16H12M10,16H12V14H8V16H10M6,16H8V14H4V16H6M23,20H24V18H23M21,20H23V18H19V20H21M17,20H19V18H15V20H17Z"/></svg>
                 CSV (tableur compatible)
               </button>
@@ -697,11 +697,11 @@
         </div>
 
         <div class="actions-bar">
-          <button type="button" class="btn btn-secondary" id="btn-print" onclick="window.print()">🖨 Imprimer la fiche</button>
-          <button type="button" class="btn btn-secondary" id="btn-share" onclick="copyShareLink()">🔗 Copier le lien</button>
-          <button type="button" class="btn btn-secondary" id="btn-import" onclick="document.getElementById('file-import').click()">📥 Importer JSON</button>
+          <button type="button" class="btn btn-secondary" id="btn-print">🖨 Imprimer la fiche</button>
+          <button type="button" class="btn btn-secondary" id="btn-share">🔗 Copier le lien</button>
+          <button type="button" class="btn btn-secondary" id="btn-import">📥 Importer JSON</button>
           <input type="file" id="file-import" accept="application/json,.json" class="hidden" aria-label="Importer un fichier JSON">
-          <button type="button" class="btn btn-secondary" id="btn-reset" onclick="resetState()">🗑 Réinitialiser</button>
+          <button type="button" class="btn btn-secondary" id="btn-reset">🗑 Réinitialiser</button>
         </div>
         <p class="label-hint" style="margin:8px 0 0">🔗 Le lien de partage embarque tes saisies en clair (base64) dans l'URL — lisible dans l'historique du navigateur et les journaux des serveurs : ne le transmets qu'à toi-même.</p>
 

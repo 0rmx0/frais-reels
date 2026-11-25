@@ -31,10 +31,36 @@ const $ = (id) => document.getElementById(id);
 document.addEventListener('DOMContentLoaded', function () {
   initYearSelector();
   initInputListeners();
+  initButtons();
   initImport();
   restoreState();
   registerSW();
 });
+
+// --- BOUTONS (CSP script-src 'self' : aucun gestionnaire inline dans le HTML) ---
+function initButtons() {
+  document.querySelectorAll('.card-header[aria-controls]').forEach(h => {
+    h.addEventListener('click', () => toggleCard(h.getAttribute('aria-controls').replace(/^body-/, '')));
+  });
+  const bindToggleGroup = (groupId, handler) => {
+    document.querySelectorAll(`#${groupId} .toggle-btn`).forEach(b => {
+      b.addEventListener('click', () => handler(b.dataset.type, b));
+    });
+  };
+  bindToggleGroup('transport-type', setTransport);
+  bindToggleGroup('repas-type', setRepasType);
+  bindToggleGroup('mutuelle-type', setMutuelle);
+  const ddBtn = document.querySelector('.export-dropdown-btn');
+  if (ddBtn) ddBtn.addEventListener('click', showExportMenu);
+  document.querySelectorAll('#export-menu .export-btn').forEach(b => {
+    b.addEventListener('click', () => { exportCalculs(b.dataset.format || 'txt'); showExportMenu(); });
+  });
+  const onClick = (id, fn) => { const el = $(id); if (el) el.addEventListener('click', fn); };
+  onClick('btn-print', () => window.print());
+  onClick('btn-share', copyShareLink);
+  onClick('btn-import', () => { const fi = $('file-import'); if (fi) fi.click(); });
+  onClick('btn-reset', resetState);
+}
 
 // --- SÉLECTEUR D'ANNÉE ---
 function initYearSelector() {

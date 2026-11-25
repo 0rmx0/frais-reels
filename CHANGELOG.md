@@ -3,6 +3,11 @@
 Toutes les évolutions notables de ce projet sont documentées ici.
 Le format suit [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) et le versionnage sémantique.
 
+## [2.1.2] — 2026-11-25
+
+### Corrigé (bug bloquant)
+- **Aucun bouton ne répondait** : la CSP `script-src 'self'` (ajoutée en 2.1.0) bloquait tous les gestionnaires `onclick` inline du HTML. Tous les boutons (cartes pliantes, toggles transport/repas/mutuelle, menu d'export, imprimer, copier le lien, importer, réinitialiser) sont désormais branchés via `addEventListener` dans `app.js` — la CSP stricte est conservée. Cache service worker incrémenté pour forcer le rechargement des assets corrigés.
+
 ## [2.1.1] — 2026-11-25
 
 ### Corrigé (justesse fiscale et conformité légale)
